@@ -7,6 +7,7 @@ Author:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ujson import load as json_load
 
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import masked_softmax
@@ -220,3 +221,57 @@ class BiDAFOutput(nn.Module):
         log_p2 = masked_softmax(logits_2.squeeze(), mask, log_softmax=True)
 
         return log_p1, log_p2
+
+# https://github.com/jojonki/BiDAF/blob/master/layers/char_embedding.py
+class CharEmbedding(nn.Module):
+    '''
+     In : (N, sentence_len, word_len, vocab_size_c)
+     Out: (N, sentence_len, c_embd_size)
+     '''
+    def __init__(self, embed_size, hidden_size, kernel_size):
+        super(CharEmbedding, self).__init__()
+        self.embed_size = embed_size
+        with open('data/char_emb_for_word.json', 'r') as fh:
+            self.embedding = json_load(fh)
+        # may need to modify later
+        # self.conv = nn.Conv1d(1, hidden_size, kernel_size, stride=1, padding=0)
+        filters = [[1,5]]
+        self.conv = nn.ModuleList([nn.Conv2d(1, hidden_size, (f[0], f[1])) for f in filters])
+        self.dropout = nn.Dropout(.2)
+
+    def forward(self, x):
+        # x: (N, seq_len)
+        print("x", x.shape)
+        input_shape = x.size()
+        # apply embedding
+        emb = []
+        for sen in x:
+            curr_emb = []
+            for word_tensor in sen:
+                wordid = str(int(word_tensor))
+                if wordid not in self.embedding:
+                    curr_emb.append([0]*self.embed_size)
+                else:
+                    curr_emb.append(self.embedding[wordid])
+            emb.append(curr_emb)
+        x = torch.tensor(emb, dtype=torch.float, device=x.device)# (N, seq_len, c_embd_size)
+        assert x.shape[0] == input_shape[0] 
+        # CNN
+        x = x.unsqueeze(1) # (N, Cin, seq_len, c_embd_size), insert Channnel-In dim
+        # Conv2d
+        #    Input : (N,Cin, Hin, Win )
+        #    Output: (N,Cout,Hout,Wout)
+        x = [F.relu(conv(x)) for conv in self.conv] # (N, Cout, seq_len, c_embd_size-filter_w+1). stride == 1
+        # [(N,Cout,Hout,Wout) -> [(N,Cout,Hout*Wout)] * len(filter_heights)
+
+        # [(N, seq_len, c_embd_size-filter_w+1, Cout)] * len(filter_heights)
+        x = [xx.view((xx.size(0), xx.size(2), xx.size(3), xx.size(1))) for xx in x]
+
+        # maxpool like
+        # [(N, seq_len, Cout)] * len(filter_heights)
+        x = [torch.sum(xx, 2) for xx in x]
+        # (N, seq_len, Cout==word_embd_size)
+        x = torch.cat(x, 1)
+        x = self.dropout(x)
+        print("out", x.shape)
+        return x
