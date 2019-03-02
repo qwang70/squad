@@ -241,7 +241,6 @@ class CharEmbedding(nn.Module):
 
     def forward(self, x):
         # x: (N, seq_len)
-        print("x", x.shape)
         input_shape = x.size()
         # apply embedding
         emb = []
@@ -273,5 +272,4 @@ class CharEmbedding(nn.Module):
         # (N, seq_len, Cout==word_embd_size)
         x = torch.cat(x, 1)
         x = self.dropout(x)
-        print("out", x.shape)
         return x
