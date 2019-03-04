@@ -8,7 +8,6 @@ import layers
 import torch
 import torch.nn as nn
 
-from nmt_model import Hypothesis, NMT
 
 class BiDAF(nn.Module):
     """Baseline BiDAF model for SQuAD.
@@ -30,54 +29,51 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, char_embed_size, drop_prob=0.):
+    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
-        kernel_size = 5
-        self.char_emb = layers.CharEmbedding(embed_size=char_embed_size, 
-                        hidden_size=hidden_size, 
-                        kernel_size=kernel_size)
-        self.word_emb = layers.Embedding(word_vectors=word_vectors,
-                                    hidden_size=hidden_size,
+        self.embd_size = hidden_size
+        self.d = self.embd_size * 2 # word_embedding + char_embedding
+        self.emb = layers.Embedding(word_vectors=word_vectors,
+                                    hidden_size=self.embd_size,
                                     drop_prob=drop_prob)
 
         # layer size 需要改
-        self.enc = layers.RNNEncoder(input_size=hidden_size*2,
-                                     hidden_size=hidden_size,
+        self.enc = layers.RNNEncoder(input_size=self.d,
+                                     hidden_size=self.d,
                                      num_layers=1,
                                      drop_prob=drop_prob)
 
-        self.att = layers.BiDAFAttention(hidden_size=2 * hidden_size,
+        self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
 
-        self.mod = layers.RNNEncoder(input_size=8 * hidden_size,
-                                     hidden_size=hidden_size,
+        self.mod = layers.RNNEncoder(input_size=8 * self.d,
+                                     hidden_size=self.d,
                                      num_layers=2,
                                      drop_prob=drop_prob)
 
-        self.out = layers.BiDAFOutput(hidden_size=hidden_size,
+        self.out = layers.BiDAFOutput(hidden_size=self.d,
                                       drop_prob=drop_prob)
 
-    def forward(self, cw_idxs, qw_idxs):
+    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
         # char emb
-        c_char_emb = self.char_emb(cw_idxs)         # (batch_size, c_len, hidden_size)
-        q_char_emb = self.char_emb(qw_idxs)         # (batch_size, q_len, hidden_size)
-
-        c_word_emb = self.word_emb(cw_idxs)         # (batch_size, c_len, hidden_size)
-        q_word_emb = self.word_emb(qw_idxs)         # (batch_size, q_len, hidden_size)
-
-        c_emb = torch.cat((c_char_emb, c_word_emb), 2) # (batch_size, c_len, 2*hidden_size)
-        q_emb = torch.cat((q_char_emb, q_word_emb), 2) # (batch_size, q_len, 2*hidden_size)
-        c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
-        q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
+        c_emb = self.emb(cc_idxs, cw_idxs)         # (batch_size, c_len, d)
+        q_emb = self.emb(qc_idxs, qw_idxs)         # (batch_size, q_len, d)
+        assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
+        
+        c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)
+        q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * d)
+        assert c_enc.size(2) == 2 * self.d and q_enc.size(2) == 2 * self.d
 
         att = self.att(c_enc, q_enc,
-                       c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
+                       c_mask, q_mask)    # (batch_size, c_len, 8 * d)
+        assert att.size(2) == 8 * self.d
 
-        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
+        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
+        assert mod.size(2) == 2 * self.d
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
 
