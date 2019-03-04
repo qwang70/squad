@@ -27,15 +27,22 @@ class Embedding(nn.Module):
     def __init__(self, word_vectors, hidden_size, drop_prob):
         super(Embedding, self).__init__()
         self.drop_prob = drop_prob
-        self.embed = nn.Embedding.from_pretrained(word_vectors)
+        self.char_embed = CharEmbedding(embed_size=word_vectors.size(1), 
+                                        hidden_size=hidden_size, 
+                                        drop_prob=drop_prob)
+        self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        self.hwy = HighwayEncoder(2, hidden_size)
+        self.hwy = HighwayEncoder(2, 2 * hidden_size)
 
-    def forward(self, x):
-        emb = self.embed(x)   # (batch_size, seq_len, embed_size)
-        emb = F.dropout(emb, self.drop_prob, self.training)
-        emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
+    def forward(self, c_idxs, w_idxs):
+        # word_embedding
+        word_emb = self.word_embed(w_idxs)   # (batch_size, seq_len, embed_size)
+        word_emb = F.dropout(word_emb, self.drop_prob, self.training)
+        word_emb = self.proj(word_emb)  # (batch_size, seq_len, hidden_size)
+        # char_embedding
+        char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, hidden_size)
+        emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * hidden_size)
+        emb = self.hwy(emb)   # (batch_size, seq_len, 2 * hidden_size)
 
         return emb
 
@@ -228,33 +235,25 @@ class CharEmbedding(nn.Module):
      In : (N, sentence_len, word_len, vocab_size_c)
      Out: (N, sentence_len, c_embd_size)
      '''
-    def __init__(self, embed_size, hidden_size, kernel_size):
+    def __init__(self, embed_size, hidden_size, drop_prob):
         super(CharEmbedding, self).__init__()
         self.embed_size = embed_size
-        with open('data/char_emb_for_word.json', 'r') as fh:
-            self.embedding = json_load(fh)
+        vocab_size_c = 1376
+        self.embedding = nn.Embedding(vocab_size_c, embed_size)
         # may need to modify later
         # self.conv = nn.Conv1d(1, hidden_size, kernel_size, stride=1, padding=0)
         filters = [[1,5]]
         self.conv = nn.ModuleList([nn.Conv2d(1, hidden_size, (f[0], f[1])) for f in filters])
-        self.dropout = nn.Dropout(.2)
+        self.drop_prob = drop_prob
 
     def forward(self, x):
-        # x: (N, seq_len)
+        # x: (N, seq_len, word_len)
         input_shape = x.size()
-        # apply embedding
-        emb = []
-        for sen in x:
-            curr_emb = []
-            for word_tensor in sen:
-                wordid = str(int(word_tensor))
-                if wordid not in self.embedding:
-                    curr_emb.append([0]*self.embed_size)
-                else:
-                    curr_emb.append(self.embedding[wordid])
-            emb.append(curr_emb)
-        x = torch.tensor(emb, dtype=torch.float, device=x.device)# (N, seq_len, c_embd_size)
-        assert x.shape[0] == input_shape[0] 
+        word_len = x.size(2)
+        x = x.view(-1, word_len) # (N*seq_len, word_len)
+        x = self.embedding(x) # (N*seq_len, word_len, c_embd_size)
+        x = x.view(*input_shape, -1) # (N, seq_len, word_len, c_embd_size)
+        x = x.sum(2) # (N, seq_len, c_embd_size)
         # CNN
         x = x.unsqueeze(1) # (N, Cin, seq_len, c_embd_size), insert Channnel-In dim
         # Conv2d
@@ -271,5 +270,5 @@ class CharEmbedding(nn.Module):
         x = [torch.sum(xx, 2) for xx in x]
         # (N, seq_len, Cout==word_embd_size)
         x = torch.cat(x, 1)
-        x = self.dropout(x)
+        x = F.dropout(x, self.drop_prob, self.training)
         return x

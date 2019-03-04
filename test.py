@@ -44,7 +44,8 @@ def main(args):
     # Get model
     log.info('Building model...')
     model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size)
+                  hidden_size=args.hidden_size,
+                  drop_prob=args.drop_prob)
     model = nn.DataParallel(model, gpu_ids)
     log.info('Loading checkpoint from {}...'.format(args.load_path))
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
@@ -73,12 +74,14 @@ def main(args):
             tqdm(total=len(dataset)) as progress_bar:
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Setup for forward
+            cc_idxs = cc_idxs.to(device)
+            qc_idxs = qc_idxs.to(device)
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs)
+            log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)
