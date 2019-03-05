@@ -24,25 +24,30 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, word_vectors, hidden_size, drop_prob):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob):
         super(Embedding, self).__init__()
         self.drop_prob = drop_prob
-        self.char_embed = CharEmbedding(embed_size=word_vectors.size(1), 
-                                        hidden_size=hidden_size, 
-                                        drop_prob=drop_prob)
+        self.char_embed = CharEmbedding(char_vectors=char_vectors,
+                                        hidden_size=hidden_size,
+                                        drop_prob=drop_prob) 
         self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
         self.hwy = HighwayEncoder(2, 2 * hidden_size)
+        self.embed_size = hidden_size
 
     def forward(self, c_idxs, w_idxs):
         # word_embedding
         word_emb = self.word_embed(w_idxs)   # (batch_size, seq_len, embed_size)
         word_emb = F.dropout(word_emb, self.drop_prob, self.training)
-        word_emb = self.proj(word_emb)  # (batch_size, seq_len, hidden_size)
+        word_emb = self.proj(word_emb)  # (batch_size, seq_len, embed_size)
+        assert word_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
         # char_embedding
-        char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, hidden_size)
-        emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * hidden_size)
-        emb = self.hwy(emb)   # (batch_size, seq_len, 2 * hidden_size)
+        char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, embed_size)
+        assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
+        emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
+        emb = self.hwy(emb)   # (batch_size, seq_len, 2 * embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
 
         return emb
 
@@ -235,18 +240,21 @@ class CharEmbedding(nn.Module):
      In : (N, sentence_len, word_len, vocab_size_c)
      Out: (N, sentence_len, c_embd_size)
      '''
-    def __init__(self, embed_size, hidden_size, drop_prob):
+    def __init__(self, char_vectors, hidden_size, drop_prob):
         super(CharEmbedding, self).__init__()
-        self.embed_size = embed_size
-        vocab_size_c = 1376
-        self.embedding = nn.Embedding(vocab_size_c, embed_size)
-        # may need to modify later
-        # self.conv = nn.Conv1d(1, hidden_size, kernel_size, stride=1, padding=0)
+        self.hidden_size = hidden_size
+        self.drop_prob = drop_prob
+        self.embedding = nn.Embedding.from_pretrained(char_vectors, freeze=False)
+        self.c_embd_size = char_vectors.size(1)
+        self.kernel_size = 5
+        self.conv = nn.Conv1d(self.c_embd_size, hidden_size, self.kernel_size, stride=1, padding=0)
+        """
         filters = [[1,5]]
         self.conv = nn.ModuleList([nn.Conv2d(1, hidden_size, (f[0], f[1])) for f in filters])
-        self.drop_prob = drop_prob
+        """
 
     def forward(self, x):
+        """
         # x: (N, seq_len, word_len)
         input_shape = x.size()
         word_len = x.size(2)
@@ -272,3 +280,24 @@ class CharEmbedding(nn.Module):
         x = torch.cat(x, 1)
         x = F.dropout(x, self.drop_prob, self.training)
         return x
+        """
+        # x: (N, seq_len, word_len)
+        input_shape = x.size()
+        word_len = x.size(2)
+        x = x.view(-1, word_len) # (N*seq_len, word_len)
+        assert x.shape == (input_shape[0]*input_shape[1], input_shape[2])
+        x = self.embedding(x) # (N*seq_len, word_len, c_embd_size)
+        assert x.shape == (input_shape[0]*input_shape[1], input_shape[2], self.c_embd_size)
+        x = x.transpose(1,2) # (N * seq_len, c_embd_size, word_len)
+        assert x.shape == (input_shape[0]*input_shape[1], self.c_embd_size, input_shape[2])
+        # Dropout before conv
+        # https://github.com/allenai/bi-att-flow/blob/master/my/tensorflow/nn.py#L163
+        x = F.dropout(x, self.drop_prob, self.training)
+        x = self.conv(x) #(N * seq_len, hidden, 64/filter_size)
+        x = F.relu(x)
+        # MaxPool simply takes the maximum across the second dimension
+        # position 1 is the batch channel
+        x = torch.max(x, 2)[0]
+        x = x.view(input_shape[0], input_shape[1], self.hidden_size)
+        return x 
+

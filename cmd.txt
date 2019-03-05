@@ -1,1 +1,3 @@
 python test.py --split dev --load_path save/train/FOLDER/best.pth.tar --name NAME
+tensorboard --logdir save --port 5678
+ssh -N -f -L localhost:1234:localhost:5678 <user>@<remote>
