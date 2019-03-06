@@ -54,7 +54,7 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=self.d,
                                       drop_prob=drop_prob)
 
-    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs,cwf, qwf):
+    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs,cwf):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
