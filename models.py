@@ -54,7 +54,7 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=self.d,
                                       drop_prob=drop_prob)
 
-    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs,cwf):
+    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs,cwf, qwf):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
@@ -68,9 +68,12 @@ class BiDAF(nn.Module):
         cwf = cwf.type(torch.cuda.FloatTensor)
         c_emb = torch.cat((c_emb, cwf), dim = 2)
 
-        s = q_emb.shape
-        qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
-        q_emb = torch.cat((q_emb, qf_emb), dim = 2)
+        qwf = torch.unsqueeze(qwf, dim = 2)
+        qwf = qwf.type(torch.cuda.FloatTensor)
+        q_emb = torch.cat((q_emb, qwf), dim = 2)
+        #s = q_emb.shape
+        #qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
+        #q_emb = torch.cat((q_emb, qf_emb), dim = 2)
         assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
         
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)

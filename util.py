@@ -81,8 +81,15 @@ class SQuAD(data.Dataset):
                 if word in self.question_idxs[idx]:
                     context_word_features[j] = 1
                 else:
-                    context_word_features[j] = -1
+                    context_word_features[j] = 0
         return context_word_features
+   
+   #all 0
+   def compute_question_word_features(self, idx):
+        s = self.question_idxs[idx].shape
+        question_word_features = torch.zeros(s[0])
+        return question_word_features
+
 
     def __getitem__(self, idx):
         idx = self.valid_idxs[idx]
@@ -94,7 +101,8 @@ class SQuAD(data.Dataset):
                    self.y2s[idx],
                    self.ids[idx],
                    #get word features
-                   self.compute_context_word_features(idx))
+                   self.compute_context_word_features(idx),
+                   self.compute_question_word_features(idx))
 
         return example
 
@@ -142,7 +150,7 @@ def collate_fn(examples):
     # Group by tensor type
     context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
-        y1s, y2s, ids, cwf = zip(*examples)
+        y1s, y2s, ids, cwf, qwf = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
@@ -150,13 +158,14 @@ def collate_fn(examples):
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
     cwf = merge_1d(cwf)
+    qwf = merge_1d(qwf)
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
-            y1s, y2s, ids, cwf)
+            y1s, y2s, ids, cwf, qwf)
 
 
 class AverageMeter:
