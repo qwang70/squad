@@ -68,12 +68,12 @@ class BiDAF(nn.Module):
         cwf = cwf.type(torch.cuda.FloatTensor)
         c_emb = torch.cat((c_emb, cwf), dim = 2)
 
-        qwf = torch.unsqueeze(qwf, dim = 2)
-        qwf = qwf.type(torch.cuda.FloatTensor)
-        q_emb = torch.cat((q_emb, qwf), dim = 2)
-        #s = q_emb.shape
-        #qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
-        #q_emb = torch.cat((q_emb, qf_emb), dim = 2)
+        # qwf = torch.unsqueeze(qwf, dim = 2)
+        # qwf = qwf.type(torch.cuda.FloatTensor)
+        # q_emb = torch.cat((q_emb, qwf), dim = 2)
+        s = q_emb.shape
+        qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
+        q_emb = torch.cat((q_emb, qf_emb), dim = 2)
         assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
         
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)
