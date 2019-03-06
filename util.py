@@ -81,7 +81,7 @@ class SQuAD(data.Dataset):
                 if word in self.question_idxs[idx]:
                     context_word_features[j] = 1
                 else:
-                    context_word_features[j] = 0
+                    context_word_features[j] = -1
         return context_word_features
    
     #all 0
