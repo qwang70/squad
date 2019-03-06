@@ -84,10 +84,13 @@ class SQuAD(data.Dataset):
                     context_word_features[j] = -1
         return context_word_features
    
-    #all 0
+    #all -1
     def compute_question_word_features(self, idx):
         s = self.question_idxs[idx].shape
         question_word_features = torch.zeros(s[0])
+        for j, word in enumerate(self.question_idxs[idx]):
+            if word != 0:
+                question_word_features[j]=-1
         return question_word_features
 
 
