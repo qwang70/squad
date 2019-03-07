@@ -32,13 +32,13 @@ class BiDAF(nn.Module):
     def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
         self.embd_size = hidden_size
-        self.d = self.embd_size * 2 # word_embedding + char_embedding
+        self.d = self.embd_size * 2+1 # word_embedding + char_embedding + word_feature
         self.emb = layers.Embedding(word_vectors=word_vectors, char_vectors=char_vectors,
                                     hidden_size=self.embd_size,
                                     drop_prob=drop_prob)
 
         # layer size 需要改
-        self.enc = layers.RNNEncoder(input_size=self.d+1,
+        self.enc = layers.RNNEncoder(input_size=self.d,
                                      hidden_size=self.d,
                                      num_layers=1,
                                      drop_prob=drop_prob)
@@ -74,7 +74,7 @@ class BiDAF(nn.Module):
         s = q_emb.shape
         qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
         q_emb = torch.cat((q_emb, qf_emb), dim = 2)
-        #assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
+        assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
         
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * d)
