@@ -29,15 +29,17 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0.):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0., enable_EM=True):
         super(BiDAF, self).__init__()
         self.embd_size = hidden_size
-        self.d = self.embd_size * 2+1 # word_embedding + char_embedding + word_feature
+        self.d = self.embd_size * 2 # word_embedding + char_embedding
+        self.enable_EM = enable_EM
+        if enable_EM:
+            self.d += 2                 # word_feature
         self.emb = layers.Embedding(word_vectors=word_vectors, char_vectors=char_vectors,
                                     hidden_size=self.embd_size,
                                     drop_prob=drop_prob)
 
-        # layer size 需要改
         self.enc = layers.RNNEncoder(input_size=self.d,
                                      hidden_size=self.d,
                                      num_layers=1,
@@ -54,7 +56,7 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=self.d,
                                       drop_prob=drop_prob)
 
-    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs,cwf):
+    def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf=None, lemma_indicators=None):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
@@ -63,17 +65,20 @@ class BiDAF(nn.Module):
         c_emb = self.emb(cc_idxs, cw_idxs)         # (batch_size, c_len, d)
         q_emb = self.emb(qc_idxs, qw_idxs)         # (batch_size, q_len, d)
 
-        # word feature
-        cwf = torch.unsqueeze(cwf, dim = 2)
-        cwf = cwf.type(torch.cuda.FloatTensor)
-        c_emb = torch.cat((c_emb, cwf), dim = 2)
+        if self.enable_EM:
+            # word feature
+            cwf = torch.unsqueeze(cwf, dim = 2)
+            cwf = cwf.float()
+            lemma_indicators = torch.unsqueeze(lemma_indicators, dim = 2)
+            lemma_indicators = lemma_indicators.float()
+            c_emb = torch.cat((c_emb, cwf, lemma_indicators), dim = 2)
 
-        # qwf = torch.unsqueeze(qwf, dim = 2)
-        # qwf = qwf.type(torch.cuda.FloatTensor)
-        # q_emb = torch.cat((q_emb, qwf), dim = 2)
-        s = q_emb.shape
-        qf_emb = torch.zeros(s[0],s[1],1, device='cuda')
-        q_emb = torch.cat((q_emb, qf_emb), dim = 2)
+            s = q_emb.shape
+            # 0 embedding for exact match and indicators
+            # qf_emb = torch.zeros(s[0],s[1],2, device=q_emb.device)
+            # -1 embedding for exact match and indicators
+            qf_emb = torch.ones(s[0],s[1],2, device=q_emb.device)*-1
+            q_emb = torch.cat((q_emb, qf_emb), dim = 2)
         assert c_emb.size(2) == self.d and q_emb.size(2) == self.d
         
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)
