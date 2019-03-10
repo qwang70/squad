@@ -17,8 +17,9 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
             if word != 0:
                 word_count.update([word])
     mc = word_count.most_common(num_top)
-    with open(output_file, 'w') as outfile:  
-        json.dump([item[0] for item in mc].sort(), outfile)
+    outfile = open(output_file, "w")
+    json.dump([item[0] for item in mc].sort(), outfile)
+    outfile.close()
 
 
 
@@ -29,7 +30,7 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        compute_top_question_words(question_idxs, 'data/' + data_path.split('.')[0] + 'frequent.json')
+        compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_frequent.json')
 
 
 
