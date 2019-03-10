@@ -73,6 +73,7 @@ with open("data/idx2word.json") as f:
         em_indicators = np.zeros(context_idxs.shape)
         for idx, row in enumerate(context_idxs):
             if idx % 1000 == 0:
+                print(data_path)
                 print(idx)
             for j, word in enumerate(row):
                 if word != 0:
