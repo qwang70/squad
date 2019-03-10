@@ -5,12 +5,30 @@ import json
 # load spacy model
 nlp = spacy.load('en')
 data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+output_file = 'data/frequent.json'
+
+
+def compute_top_question_words(question_idxs, output_file, num_top = 20):
+    word_count = Counter()
+    for question in question_idxs:
+        for word in question:
+            if word != 0:
+                word_count.update([word])
+    mc = word_count.most_common(num_top)
+    with open(output_file, 'w') as outfile:  
+        json.dump([item[0] for item in mc].sorted(), outfile)
+
+
 with open("data/idx2word.json") as f:
     idx2word = json.load(f)
     for data_path in data_paths:
         dataset = np.load(data_path)
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
+
+        compute_top_question_words(question_idxs, output_file)
+
+
 
 
         # init EM mat
@@ -24,6 +42,8 @@ with open("data/idx2word.json") as f:
                         em_indicators[idx, j] = 1
                     else:
                         em_indicators[idx, j] = -1
+
+
 
         # init lemma mat
         lemma_indicators = np.zeros(context_idxs.shape)
