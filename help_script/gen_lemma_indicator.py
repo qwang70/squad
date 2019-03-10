@@ -59,11 +59,11 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_frequent.json')
-
+        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_word_dict.json')
+        print(question_idxs[2][:10])
         convert_to_new(context_idxs, new_idx)
         convert_to_new(question_idxs, new_idx)
-
+        print(question_idxs[2][:10])
         
 
 
