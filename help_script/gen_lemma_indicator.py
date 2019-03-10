@@ -13,17 +13,16 @@ output_file = 'data/frequent.json'
 
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
-    maxidx = 0
     for question in question_idxs:
         for word in question:
             if word != 0:
                 word_count.update([word])
-                if word > maxidx:
-                    maxidx = word
+
     mc = word_count.most_common(num_top)
 
     outlist = [int(item[0]) for item in mc] + [0]
     outlist.sort()
+    maxidx = outlist[-1]
 
 
     old_idx = outlist + [i for i in range(maxidx + 1) if i not in outlist]
@@ -41,9 +40,11 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
 
 
 def convert_to_new(idxs, new_idx):
+    l = len(new_idx)
     for row in idxs:
         for j, idx in enumerate(row):
-            row[j] = new_idx[idx]
+            if idx < l:
+                row[j] = new_idx[idx]
 
 
 
