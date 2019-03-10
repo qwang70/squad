@@ -4,9 +4,7 @@ import json
 
 # load spacy model
 nlp = spacy.load('en')
-<<<<<<< HEAD
-data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
-=======
+
 data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
 output_file = 'data/frequent.json'
 
@@ -22,7 +20,7 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
         json.dump([item[0] for item in mc].sorted(), outfile)
 
 
->>>>>>> fe75cd982cf5907d0b3b25332b198bfe668016eb
+
 with open("data/idx2word.json") as f:
     idx2word = json.load(f)
     for data_path in data_paths:
