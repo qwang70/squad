@@ -6,7 +6,7 @@ from collections import Counter
 # load spacy model
 nlp = spacy.load('en')
 
-data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
 output_file = 'data/frequent.json'
 
 
@@ -29,7 +29,7 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        # compute_top_question_words(question_idxs, 'data/' + data_path.split('.')[0] + 'frequent.json')
+        compute_top_question_words(question_idxs, 'data/' + data_path.split('.')[0] + 'frequent.json')
 
 
 
