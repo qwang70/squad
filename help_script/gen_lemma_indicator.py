@@ -6,22 +6,48 @@ from collections import Counter
 # load spacy model
 nlp = spacy.load('en')
 
-data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+# data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+data_paths = ['data/test.npz']
 output_file = 'data/frequent.json'
 
 
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
+    maxidx = 0
     for question in question_idxs:
         for word in question:
             if word != 0:
                 word_count.update([word])
+                if word > maxidx:
+                    maxidx = word
     mc = word_count.most_common(num_top)
-    outfile = open(output_file, "w")
-    outlist = [int(item[0]) for item in mc]
+
+    outlist = [int(item[0]) for item in mc] + [0]
     outlist.sort()
-    json.dump(list(outlist), outfile)
+
+
+    old_idx = outlist + [i for i in range(maxidx + 1) if i not in outlist]
+    assert len(old_idx) == maxidx + 1
+    outfile = open(output_file, "w")
+    json.dump(old_idx, outfile)
     outfile.close()
+
+    new_idx = [0 for i in range(maxidx + 1)]
+    for idx in old_idx:
+        new_idx[old_idx[idx]] = idx
+    return new_idx
+
+
+
+
+def convert_to_new(idxs, new_idx):
+    for row in idxs:
+        for j, idx in row:
+            row[j] = new_idx[idx]
+
+
+
+
 
 
 
@@ -32,7 +58,14 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_frequent.json')
+        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_frequent.json')
+
+        convert_to_new(context_idxs, new_idx)
+        convert_to_new(question_idxs, new_idx)
+
+        
+
+
 
 
 
