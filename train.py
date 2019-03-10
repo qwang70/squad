@@ -86,6 +86,18 @@ def main(args):
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
 
+    word_dict_file = open('data/train_frequent.json', 'r')
+    word_dict = json.load(word_dict_file)
+    curr_emb = []
+    embedding = model.emb.word_emb.weight.data
+    for idx in word_dict:
+        curr_emb.append(embedding[idx].clone())
+    for i, emb in embedding:
+        embedding[i].copy_(emb)
+    model.emb.register_buffer(
+        'fixed_embedding', embedding[20:].clone()
+    )
+
     # Train
     log.info('Training...')
     steps_till_eval = args.eval_steps
