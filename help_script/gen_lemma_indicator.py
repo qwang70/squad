@@ -18,7 +18,9 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
                 word_count.update([word])
     mc = word_count.most_common(num_top)
     outfile = open(output_file, "w")
-    json.dump([item[0] for item in mc].sort(), outfile)
+    outlist = [item[0] for item in mc].sort()
+    print(outlist)
+    json.dump(outlist, outfile)
     outfile.close()
 
 
