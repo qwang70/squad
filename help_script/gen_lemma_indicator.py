@@ -29,7 +29,7 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        compute_top_question_words(question_idxs, output_file)
+        # compute_top_question_words(question_idxs, 'data/' + data_path.split('.')[0] + 'frequent.json')
 
 
 
