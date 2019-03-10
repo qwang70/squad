@@ -42,7 +42,7 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
 
 def convert_to_new(idxs, new_idx):
     for row in idxs:
-        for j, idx in row:
+        for j, idx in enumerate(row):
             row[j] = new_idx[idx]
 
 
