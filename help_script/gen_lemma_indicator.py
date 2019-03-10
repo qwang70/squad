@@ -21,6 +21,7 @@ def compute_top_question_words(question_idxs, output_file, num_top = 20):
     outlist = [item[0] for item in mc]
     outlist.sort()
     print(outlist)
+    json.dumps(outlist)
     json.dump(list(outlist), outfile)
     outfile.close()
 
