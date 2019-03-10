@@ -1,6 +1,7 @@
 import numpy as np
 import spacy
 import json
+from collections import Counter
 
 # load spacy model
 nlp = spacy.load('en')
