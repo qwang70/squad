@@ -4,7 +4,7 @@ import json
 
 # load spacy model
 nlp = spacy.load('en')
-data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
 with open("data/idx2word.json") as f:
     idx2word = json.load(f)
     for data_path in data_paths:
