@@ -50,7 +50,7 @@ class BiDAF(nn.Module):
         #                                  drop_prob=drop_prob)
         self.selfMatch = layers.StaticDotAttention(memory_size = 8 * self.d, 
                         input_size = 8 * self.d, attention_size = 8 * self.d,
-                        batch_first=False, drop_prob=drop_prob)
+                        drop_prob=drop_prob)
 
         self.mod = layers.RNNEncoder(input_size=16 * self.d,
                                      hidden_size=self.d,
@@ -84,12 +84,10 @@ class BiDAF(nn.Module):
         
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * d)
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * d)
-        print("q_enc", q_enc.shape)
         assert c_enc.size(2) == 2 * self.d and q_enc.size(2) == 2 * self.d
 
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * d)
-        print("att", att.shape)
         assert att.size(2) == 8 * self.d
 
         # selfMatch = self.selfMatch(att)
