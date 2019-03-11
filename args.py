@@ -179,13 +179,16 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./data/train.npz')
+                        default='./data/train_features.npz')
+                        # default='./data/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./data/dev.npz')
+                        default='./data/dev_features.npz')
+                        # default='./data/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./data/test.npz')
+                        default='./data/test_features.npz')
+                        # default='./data/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
                         default='./data/word_emb.json')
@@ -201,6 +204,9 @@ def add_common_args(parser):
     parser.add_argument('--test_eval_file',
                         type=str,
                         default='./data/test_eval.json')
+    parser.add_argument('--enable_EM',
+                        type=bool,
+                        default=True)
 
 
 def add_train_test_args(parser):

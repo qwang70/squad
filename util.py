@@ -51,6 +51,8 @@ class SQuAD(data.Dataset):
         self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
         self.y1s = torch.from_numpy(dataset['y1s']).long()
         self.y2s = torch.from_numpy(dataset['y2s']).long()
+        self.em_indicators = torch.from_numpy(dataset['em_indicators']).long()
+        self.lemma_indicators = torch.from_numpy(dataset['lemma_indicators']).long()
 
         if use_v2:
             # SQuAD 2.0: Use index 0 for no-answer token (token 1 = OOV)
@@ -65,6 +67,11 @@ class SQuAD(data.Dataset):
 
             self.y1s += 1
             self.y2s += 1
+
+            # additional features
+            zeros = torch.ones((batch_size, 1), dtype=torch.int64)
+            self.em_indicators = torch.cat((zeros, self.em_indicators), dim=1)
+            self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
 
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
@@ -103,8 +110,11 @@ class SQuAD(data.Dataset):
                    self.y1s[idx],
                    self.y2s[idx],
                    self.ids[idx],
+                   # additional features
                    #get word features
-                   self.compute_context_word_features(idx))
+                #    self.compute_context_word_features(idx),
+                   self.em_indicators[idx],
+                   self.lemma_indicators[idx])
                    # self.compute_question_word_features(idx))
 
         return example
@@ -120,11 +130,11 @@ def collate_fn(examples):
 
     Args:
         examples (list): List of tuples of the form (context_idxs, context_char_idxs,
-        question_idxs, question_char_idxs, y1s, y2s, ids).
+        question_idxs, question_char_idxs, y1s, y2s, ids, cwf).
 
     Returns:
         examples (tuple): Tuple of tensors (context_idxs, context_char_idxs, question_idxs,
-        question_char_idxs, y1s, y2s, ids). All of shape (batch_size, ...), where
+        question_char_idxs, y1s, y2s, ids, cwf). All of shape (batch_size, ...), where
         the remaining dimensions are the maximum length of examples in the input.
 
     Adapted from:
@@ -153,7 +163,7 @@ def collate_fn(examples):
     # Group by tensor type
     context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
-        y1s, y2s, ids, cwf = zip(*examples)
+        y1s, y2s, ids, cwf, lemma_indicators = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
@@ -162,13 +172,14 @@ def collate_fn(examples):
     question_char_idxs = merge_2d(question_char_idxs)
     cwf = merge_1d(cwf)
     #qwf = merge_1d(qwf)
+    lemma_indicators = merge_1d(lemma_indicators)
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
-            y1s, y2s, ids, cwf)
+            y1s, y2s, ids, cwf, lemma_indicators)
 
 
 class AverageMeter:

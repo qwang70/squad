@@ -48,7 +48,7 @@ def main(args):
     log.info('Building model...')
     model = BiDAF(word_vectors=word_vectors, char_vectors=char_vectors,
                   hidden_size=args.hidden_size,
-                  drop_prob=args.drop_prob)
+                  drop_prob=args.drop_prob, enable_EM=args.enable_EM)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info('Loading checkpoint from {}...'.format(args.load_path))
@@ -95,7 +95,7 @@ def main(args):
         log.info('Starting epoch {}...'.format(epoch))
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids, cwf in train_loader:
+            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids, cwf, lemma_indicators in train_loader:
                 # Setup for forward
                 cc_idxs = cc_idxs.to(device)
                 qc_idxs = qc_idxs.to(device)
@@ -103,11 +103,12 @@ def main(args):
                 qw_idxs = qw_idxs.to(device)
                 cwf = cwf.to(device)
                 #qwf = qwf.to(device)
+                lemma_indicators = lemma_indicators.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
 
                 # Forward
-                log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf)
+                log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf, lemma_indicators)
                 y1, y2 = y1.to(device), y2.to(device)
                 loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
                 loss_val = loss.item()
@@ -169,7 +170,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
         gold_dict = json_load(fh)
     with torch.no_grad(), \
             tqdm(total=len(data_loader.dataset)) as progress_bar:
-        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids, cwf in data_loader:
+        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids, cwf, lemma_indicators in data_loader:
             # Setup for forward
             cc_idxs = cc_idxs.to(device)
             qc_idxs = qc_idxs.to(device)
@@ -177,10 +178,11 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             qw_idxs = qw_idxs.to(device)
             cwf = cwf.to(device)
             #qwf = qwf.to(device)
+            lemma_indicators = lemma_indicators.to(device)
             batch_size = cw_idxs.size(0)
 
             # Forward
-            log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf)
+            log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf, lemma_indicators)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)
