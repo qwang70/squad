@@ -35,15 +35,19 @@ def find_overlapping_span(token_span, span):
                 break
     return (start, end)
 
-def get_pos_ner(eval_file):
+def get_pos_ner(eval_file, ids_set):
     with open(eval_file) as f:
         data = json.load(f)
         size = len(data)
         pos = np.zeros((size, 400, len(pos_dict)))
         ner = np.zeros((size, 400, len(ner_dict)))
 
+        offset = 1
         for num in data:
-            idx = int(num) - 1
+            if num not in ids_set:
+                offset += 1
+                continue
+            idx = int(num) - offset
             if idx % 1000 == 0:
                 print(idx)
             context = data[num]['context']
@@ -127,7 +131,7 @@ with open("data/idx2word.json") as f:
 
         # pos, ner
         eval_file = '{}_eval.json'.format(data_path.split('.')[0])
-        pos, ner = get_pos_ner(eval_file)
+        pos, ner = get_pos_ner(eval_file, {*dataset['ids']})
 
         # init EM mat
         em_indicators = np.zeros(context_idxs.shape)
