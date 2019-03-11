@@ -4,7 +4,7 @@ import json
 from collections import Counter
 
 # load spacy model
-nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load('en')
 
 # data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
 data_paths = ['data/test.npz']
