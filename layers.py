@@ -149,6 +149,11 @@ class BiDAFAttention(nn.Module):
         self.c_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.q_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.cq_weight = nn.Parameter(torch.zeros(1, 1, hidden_size))
+
+        self.linear_relu = nn.Sequential(
+            nn.Linear(4 * hidden_size, hidden_size, bias=True),
+            nn.ReLU()
+        )
         for weight in (self.c_weight, self.q_weight, self.cq_weight):
             nn.init.xavier_uniform_(weight)
         self.bias = nn.Parameter(torch.zeros(1))
@@ -168,7 +173,7 @@ class BiDAFAttention(nn.Module):
         b = torch.bmm(torch.bmm(s1, s2.transpose(1, 2)), c)
 
         x = torch.cat([c, a, c * a, c * b], dim=2)  # (bs, c_len, 4 * hid_size)
-
+        x = self.linear_relu(x)                     # (bs, c_len, hid_size)
         return x
 
     def get_similarity_matrix(self, c, q):
@@ -211,7 +216,7 @@ class BiDAFOutput(nn.Module):
     """
     def __init__(self, hidden_size, drop_prob):
         super(BiDAFOutput, self).__init__()
-        self.att_linear_1 = nn.Linear(8 * hidden_size, 1)
+        self.att_linear_1 = nn.Linear(2 * hidden_size, 1)
         self.mod_linear_1 = nn.Linear(2 * hidden_size, 1)
 
         self.rnn = RNNEncoder(input_size=2 * hidden_size,
@@ -219,7 +224,7 @@ class BiDAFOutput(nn.Module):
                               num_layers=1,
                               drop_prob=drop_prob)
 
-        self.att_linear_2 = nn.Linear(8 * hidden_size, 1)
+        self.att_linear_2 = nn.Linear(2 * hidden_size, 1)
         self.mod_linear_2 = nn.Linear(2 * hidden_size, 1)
 
     def forward(self, att, mod, mask):
@@ -248,39 +253,8 @@ class CharEmbedding(nn.Module):
         self.c_embd_size = char_vectors.size(1)
         self.kernel_size = 5
         self.conv = nn.Conv1d(self.c_embd_size, hidden_size, self.kernel_size, stride=1, padding=0)
-        """
-        filters = [[1,5]]
-        self.conv = nn.ModuleList([nn.Conv2d(1, hidden_size, (f[0], f[1])) for f in filters])
-        """
 
     def forward(self, x):
-        """
-        # x: (N, seq_len, word_len)
-        input_shape = x.size()
-        word_len = x.size(2)
-        x = x.view(-1, word_len) # (N*seq_len, word_len)
-        x = self.embedding(x) # (N*seq_len, word_len, c_embd_size)
-        x = x.view(*input_shape, -1) # (N, seq_len, word_len, c_embd_size)
-        x = x.sum(2) # (N, seq_len, c_embd_size)
-        # CNN
-        x = x.unsqueeze(1) # (N, Cin, seq_len, c_embd_size), insert Channnel-In dim
-        # Conv2d
-        #    Input : (N,Cin, Hin, Win )
-        #    Output: (N,Cout,Hout,Wout)
-        x = [F.relu(conv(x)) for conv in self.conv] # (N, Cout, seq_len, c_embd_size-filter_w+1). stride == 1
-        # [(N,Cout,Hout,Wout) -> [(N,Cout,Hout*Wout)] * len(filter_heights)
-
-        # [(N, seq_len, c_embd_size-filter_w+1, Cout)] * len(filter_heights)
-        x = [xx.view((xx.size(0), xx.size(2), xx.size(3), xx.size(1))) for xx in x]
-
-        # maxpool like
-        # [(N, seq_len, Cout)] * len(filter_heights)
-        x = [torch.sum(xx, 2) for xx in x]
-        # (N, seq_len, Cout==word_embd_size)
-        x = torch.cat(x, 1)
-        x = F.dropout(x, self.drop_prob, self.training)
-        return x
-        """
         # x: (N, seq_len, word_len)
         input_shape = x.size()
         word_len = x.size(2)
@@ -354,29 +328,27 @@ class StaticDotAttention(nn.Module):
             nn.Linear(memory_size, attention_size, bias=False),
             nn.ReLU()
         )
+        self.output_linear = nn.Sequential(
+            nn.Linear(3 * attention_size, attention_size, bias=True),
+            nn.ReLU()
+        )
         self.attention_size = attention_size
 
     def forward(self, inputs, memory, memory_mask):
-        # if not self.batch_first:
-        #     print("transposing")
-        #     inputs = inputs.transpose(0, 1)
-        #     memory = memory.transpose(0, 1)
-        #     memory_mask = memory_mask.transpose(0, 1)
 
         input_ = self.input_linear(inputs)
         memory_ = self.memory_linear(memory)
 
-        logits = torch.bmm(input_, memory_.transpose(2, 1)) / (self.attention_size ** 0.5)
+        logits = torch.bmm(input_, memory_.transpose(2, 1)) / (self.attention_size ** 0.5) # S
 
         memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
-        score = masked_softmax(logits, memory_mask, dim=-1)
+        score = masked_softmax(logits, memory_mask, dim=-1)     # a
 
-        context = torch.bmm(score, memory)
-        new_input = torch.cat([context, inputs], dim=-1)
+        context = torch.bmm(score, memory)                      # m
+        new_input = torch.cat([context, inputs, context * inputs], dim=-1)
+        output = self.output_linear(new_input)
 
-        # if not self.batch_first:
-        #     return new_input.transpose(0, 1)
-        return new_input
+        return output
 
 # https://github.com/matthew-z/R-net/blob/master/modules/dropout.py
 class RNNDropout(nn.Module):
