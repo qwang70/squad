@@ -4,19 +4,80 @@ import json
 from collections import Counter
 
 # load spacy model
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_web_sm')
 
-data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz']
-# data_paths = ['data/test.npz']
+# data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
+data_paths = ['data/test.npz']
 output_file = 'data/frequent.json'
 
 
-poses = ['ADJ', 'ADP', 'ADV', 'AUX', 'CONJ', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'EOL', 'NO_TAG', 'SPACE', 'X', '']
-
+# build dictionary
+poses = ['POS', 'PUNCT', 'SYM', 'ADJ', 'CCONJ', 'NUM', 'DET', 'ADV', 'ADP', 'X', 'VERB', 'NOUN', 'PROPN', 'PART', 'INTJ', 'PRON', '']
 pos_dict = {}
 for i, pos in enumerate(poses):
-    pos_dict[pos] = i + 1
+    pos_dict[pos] = i
 
+ners = [ 'PERSON','NORP','FAC','ORG','GPE','LOC','PRODUCT','EVENT', 'LAW', 'WORK_OF_ART','LANGUAGE','DATE','TIME','PERCENT','MONEY','QUANTITY','ORDINAL','CARDINAL']
+ner_dict = {}
+for i, pos in enumerate(ners):
+    ner_dict[pos] = i
+
+def find_overlapping_span(token_span, span):
+    start = -1
+    end = -1
+    for idx, s in enumerate(span):
+        if start == -1:
+            if s[0] <= token_span[0] and token_span[0] <= s[0]:
+                start = idx
+        if start != -1:
+            if s[1] <= token_span[1] and token_span[1] <= s[1]:
+                end = idx
+                break
+    return (start, end)
+
+def get_pos_ner(eval_file):
+    with open(eval_file) as f:
+        data = json.load(f)
+        size = len(data)
+        pos = np.zeros((size, 400, len(pos_dict)))
+        ner = np.zeros((size, 400, len(ner_dict)))
+
+        for num in data:
+            idx = int(num) - 1
+            if idx % 1000 == 0:
+                print(idx)
+            context = data[num]['context']
+            span = data[num]['spans']
+            doc = nlp(context)
+            # pos
+            for token in doc:
+                if token.pos_ not in poses:
+                    continue
+                pos_idx = pos_dict[token.pos_]
+                # print(token.text, token.pos_, token.pos)
+                token_span = (token.idx, token.idx + len(token.text))
+                # print(context)
+                # print("token span", token_span)
+                start, end = find_overlapping_span(token_span, span)
+                # print(start, end)
+                if start >= 0 and end >= 0 and start < 400 and end < 400:
+                    pos[idx, start:(end+1), pos_idx] = 1
+                else:
+                    print("pos out", token.text, token.pos_, token_span, start, end)
+            # ner
+            for ent in doc.ents:
+                if ent.label_ not in ners:
+                    continue
+                token_span = (ent.start_char, ent.end_char)
+                ner_idx = ner_dict[ent.label_]
+                # print(ent.text, ent.label_, ner_idx)
+                
+                start, end = find_overlapping_span(token_span, span)
+                if start >= 0 and end >= 0 and start < 400 and end < 400:
+                    ner[idx, start:(end+1), ner_idx] = 1
+                else:
+                    print("ner out",ent.text, ent.label_, token_span, start, end)
+    return pos, ner
 
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
@@ -53,12 +114,6 @@ def convert_to_new(idxs, new_idx):
             if idx < l:
                 row[j] = new_idx[idx]
 
-
-
-
-
-
-
 with open("data/idx2word.json") as f:
     idx2word = json.load(f)
     for data_path in data_paths:
@@ -69,18 +124,15 @@ with open("data/idx2word.json") as f:
 #        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_word_dict.json')
 #        convert_to_new(context_idxs, new_idx)
 #        convert_to_new(question_idxs, new_idx)
-        
 
-
-
-
-
+        # pos, ner
+        eval_file = '{}_eval.json'.format(data_path.split('.')[0])
+        pos, ner = get_pos_ner(eval_file)
 
         # init EM mat
         em_indicators = np.zeros(context_idxs.shape)
         for idx, row in enumerate(context_idxs):
             if idx % 1000 == 0:
-                print(data_path)
                 print(idx)
             for j, word in enumerate(row):
                 if word != 0:
@@ -88,8 +140,6 @@ with open("data/idx2word.json") as f:
                         em_indicators[idx, j] = 1
                     else:
                         em_indicators[idx, j] = -1
-
-
 
         # init lemma mat
         lemma_indicators = np.zeros(context_idxs.shape)
@@ -121,19 +171,6 @@ with open("data/idx2word.json") as f:
                         else:
                             lemma_indicators[idx, col_idx] = -1
 
-
-#           for idx, row in enumerate(context_idxs):
-#              sentence = ''
-#               for wordid in row:
-#                   if int(wordid) != 0:
-#                       word = idx2word[str(wordid)]
-#                       sentence += ' '
-#                       sentence += word
-#               doc = nlp(sentence)
-#               for ent in doc.ents:
-#                    print(ent.text)
-
-
         outfile = '{}_features.npz'.format(data_path.split('.')[0])
         np.savez(outfile, context_idxs=dataset['context_idxs'],\
             context_char_idxs = dataset['context_char_idxs'],\
@@ -144,7 +181,8 @@ with open("data/idx2word.json") as f:
             ids=dataset['ids'],\
             em_indicators=em_indicators,\
             lemma_indicators=lemma_indicators,\
-            pos_num = pos_num\
+            pos = pos,\
+            ner = ner
             )
 
 
