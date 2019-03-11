@@ -114,6 +114,7 @@ with open("data/idx2word.json") as f:
                     
                     for token in tokens:
                         pos_num[idx, col_idx] = pos_dict[token.pos_]
+                        print(token.pos_)
                         if token.lemma_ not in ''',.''' and token.lemma_.lower() in lemma_list:
                             lemma_indicators[idx, col_idx] = 1
                             break
