@@ -46,6 +46,9 @@ class BiDAF(nn.Module):
         self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
 
+        self.selfMatch = layers.SelfMatcher(in_size = 2 * self.d,
+                                         drop_prob=drop_prob)
+
         self.mod = layers.RNNEncoder(input_size=8 * self.d,
                                      hidden_size=self.d,
                                      num_layers=2,
@@ -84,7 +87,10 @@ class BiDAF(nn.Module):
                        c_mask, q_mask)    # (batch_size, c_len, 8 * d)
         assert att.size(2) == 8 * self.d
 
-        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
+        selfMatch = self.selfMatch(att)
+        assert selfMatch.size(2) == 8 * self.d
+
+        mod = self.mod(selfMatch, c_len)        # (batch_size, c_len, 2 * d)
         assert mod.size(2) == 2 * self.d
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)

@@ -301,3 +301,40 @@ class CharEmbedding(nn.Module):
         x = x.view(input_shape[0], input_shape[1], self.hidden_size)
         return x 
 
+# https://github.com/hengruo/RNet-pytorch/blob/master/models.py
+# Input is question-aware passage representation
+# Output is self-attention question-aware passage representation
+class SelfMatcher(nn.Module):
+    def __init__(self, in_size, drop_prob):
+        super(SelfMatcher, self).__init__()
+        self.hidden_size = in_size
+        self.in_size = in_size
+        self.gru = nn.GRUCell(input_size=in_size, hidden_size=self.hidden_size)
+        self.Wp = nn.Linear(self.in_size, self.hidden_size, bias=False)
+        self.Wp_ = nn.Linear(self.in_size, self.hidden_size, bias=False)
+        self.out_size = self.hidden_size
+        self.dropout = nn.Dropout(p=drop_prob)
+
+    def forward(self, v):
+        (batch_size, l, _) = v.size()
+        v.permute([1,0,2])
+        h = torch.randn(batch_size, self.hidden_size).to(device)
+        V = torch.randn(batch_size, self.hidden_size, 1).to(device)
+        hs = torch.zeros(l, batch_size, self.out_size).to(device)
+        
+        for i in range(l):
+            Wpv = self.Wp(v[i])
+            Wpv_ = self.Wp_(v)
+            x = F.tanh(Wpv + Wpv_)
+            x = x.permute([1, 0, 2])
+            s = torch.bmm(x, V)
+            s = torch.squeeze(s, 2)
+            a = F.softmax(s, 1).unsqueeze(1)
+            c = torch.bmm(a, v.permute([1, 0, 2])).squeeze()
+            h = self.gru(c, h)
+            hs[i] = h
+            # logger.gpu_mem_log("SelfMatcher {:002d}".format(i), ['x', 'Wpv', 'Wpv_', 's', 'c', 'hs'], [x.data, Wpv.data, Wpv_.data, s.data, c.data, hs.data])
+            del Wpv, Wpv_, x, s, a, c
+        hs = self.dropout(hs)
+        del h, v
+        return hs
