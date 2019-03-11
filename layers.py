@@ -318,9 +318,9 @@ class SelfMatcher(nn.Module):
     def forward(self, v):
         (batch_size, l, _) = v.size()
         v.permute([1,0,2])
-        h = torch.randn(batch_size, self.hidden_size).to(device)
-        V = torch.randn(batch_size, self.hidden_size, 1).to(device)
-        hs = torch.zeros(l, batch_size, self.out_size).to(device)
+        h = torch.randn(batch_size, self.hidden_size).to(v.device)
+        V = torch.randn(batch_size, self.hidden_size, 1).to(v.device)
+        hs = torch.zeros(l, batch_size, self.out_size).to(v.device)
         
         for i in range(l):
             Wpv = self.Wp(v[i])
@@ -338,3 +338,59 @@ class SelfMatcher(nn.Module):
         hs = self.dropout(hs)
         del h, v
         return hs
+
+# https://github.com/matthew-z/R-net/blob/master/modules/pair_encoder/attentions.py
+class StaticDotAttention(nn.Module):
+    def __init__(self, memory_size, input_size, attention_size,  drop_prob=0.2):
+        super(StaticDotAttention, self).__init__()
+        self.input_linear = nn.Sequential(
+            RNNDropout(drop_prob, batch_first=True),
+            nn.Linear(input_size, attention_size, bias=False),
+            nn.ReLU()
+        )
+
+        self.memory_linear = nn.Sequential(
+            RNNDropout(drop_prob, batch_first=True),
+            nn.Linear(memory_size, attention_size, bias=False),
+            nn.ReLU()
+        )
+        self.attention_size = attention_size
+
+    def forward(self, inputs, memory, memory_mask):
+        # if not self.batch_first:
+        #     print("transposing")
+        #     inputs = inputs.transpose(0, 1)
+        #     memory = memory.transpose(0, 1)
+        #     memory_mask = memory_mask.transpose(0, 1)
+
+        input_ = self.input_linear(inputs)
+        memory_ = self.memory_linear(memory)
+
+        logits = torch.bmm(input_, memory_.transpose(2, 1)) / (self.attention_size ** 0.5)
+
+        memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
+        score = masked_softmax(logits, memory_mask, dim=-1)
+
+        context = torch.bmm(score, memory)
+        new_input = torch.cat([context, inputs], dim=-1)
+
+        # if not self.batch_first:
+        #     return new_input.transpose(0, 1)
+        return new_input
+
+# https://github.com/matthew-z/R-net/blob/master/modules/dropout.py
+class RNNDropout(nn.Module):
+    def __init__(self, p, batch_first=False):
+        super().__init__()
+        self.dropout = nn.Dropout(p)
+        self.batch_first = batch_first
+
+    def forward(self, inputs):
+
+        if not self.training:
+            return inputs
+        if self.batch_first:
+            mask = inputs.new_ones(inputs.size(0), 1, inputs.size(2), requires_grad=False)
+        else:
+            mask = inputs.new_ones(1, inputs.size(1), inputs.size(2), requires_grad=False)
+        return self.dropout(mask) * inputs
