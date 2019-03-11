@@ -13,6 +13,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as sched
 import torch.utils.data as data
 import util
+import json
 
 from args import get_train_args
 from collections import OrderedDict
@@ -86,17 +87,17 @@ def main(args):
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
 
-    word_dict_file = open('data/train_frequent.json', 'r')
-    word_dict = json.load(word_dict_file)
-    curr_emb = []
-    embedding = model.emb.word_emb.weight.data
-    for idx in word_dict:
-        curr_emb.append(embedding[idx].clone())
-    for i, emb in embedding:
-        embedding[i].copy_(emb)
-    model.emb.register_buffer(
-        'fixed_embedding', embedding[20:].clone()
-    )
+# word_dict_file = open('train_tiny_frequent.json', 'r')
+#word_dict = json.load(word_dict_file)
+#curr_emb = []
+# embedding = model.emb.word_emb.weight.data
+# for idx in word_dict:
+#       curr_emb.append(embedding[idx].clone())
+#    for i, emb in embedding:
+#        embedding[i].copy_(emb)
+#    model.emb.register_buffer(
+#        'fixed_embedding', embedding[20:].clone()
+#    )
 
     # Train
     log.info('Training...')

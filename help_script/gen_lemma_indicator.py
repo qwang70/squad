@@ -11,6 +11,13 @@ data_paths = ['train_tiny.npz', 'data/train.npz', 'data/test.npz', 'data/dev.npz
 output_file = 'data/frequent.json'
 
 
+poses = ['ADJ', 'ADP', 'ADV', 'AUX', 'CONJ', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'EOL', 'NO_TAG', 'SPACE', 'X', '']
+
+pos_dict = {}
+for i, pos in enumerate(poses):
+    pos_dict[pos] = i + 1
+
+
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
     for question in question_idxs:
@@ -59,9 +66,9 @@ with open("data/idx2word.json") as f:
         context_idxs = dataset['context_idxs']
         question_idxs = dataset['ques_idxs']
 
-        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_word_dict.json')
-        convert_to_new(context_idxs, new_idx)
-        convert_to_new(question_idxs, new_idx)
+#        new_idx = compute_top_question_words(question_idxs,  data_path.split('.')[0] + '_word_dict.json')
+#        convert_to_new(context_idxs, new_idx)
+#        convert_to_new(question_idxs, new_idx)
         
 
 
@@ -86,6 +93,7 @@ with open("data/idx2word.json") as f:
 
         # init lemma mat
         lemma_indicators = np.zeros(context_idxs.shape)
+        pos_num = np.zeros(context_idxs.shape)
         for idx, row in enumerate(question_idxs):
             lemma_list = []
             # get all the lemma word in the question
@@ -95,6 +103,7 @@ with open("data/idx2word.json") as f:
                     tokens = nlp.tokenizer(word)
                     for token in tokens:
                         lemma_list.append(token.lemma_.lower())
+                
 
             # match the lemma word in the answer
             context = context_idxs[idx]
@@ -102,12 +111,28 @@ with open("data/idx2word.json") as f:
                 if int(word_id) != 0:
                     word = idx2word[str(word_id)]
                     tokens = nlp.tokenizer(word)
+                    
                     for token in tokens:
+                        pos_num[idx, col_idx] = pos_dict[token.pos_]
                         if token.lemma_ not in ''',.''' and token.lemma_.lower() in lemma_list:
                             lemma_indicators[idx, col_idx] = 1
                             break
                         else:
                             lemma_indicators[idx, col_idx] = -1
+
+
+#           for idx, row in enumerate(context_idxs):
+#              sentence = ''
+#               for wordid in row:
+#                   if int(wordid) != 0:
+#                       word = idx2word[str(wordid)]
+#                       sentence += ' '
+#                       sentence += word
+#               doc = nlp(sentence)
+#               for ent in doc.ents:
+#                    print(ent.text)
+
+
         outfile = '{}_features.npz'.format(data_path.split('.')[0])
         np.savez(outfile, context_idxs=dataset['context_idxs'],\
             context_char_idxs = dataset['context_char_idxs'],\
@@ -117,6 +142,8 @@ with open("data/idx2word.json") as f:
             y2s=dataset['y2s'],\
             ids=dataset['ids'],\
             em_indicators=em_indicators,\
-            lemma_indicators=lemma_indicators)
+            lemma_indicators=lemma_indicators,\
+            pos_num = pos_num\
+            )
 
 
