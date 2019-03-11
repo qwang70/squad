@@ -53,6 +53,8 @@ class SQuAD(data.Dataset):
         self.y2s = torch.from_numpy(dataset['y2s']).long()
         self.em_indicators = torch.from_numpy(dataset['em_indicators']).long()
         self.lemma_indicators = torch.from_numpy(dataset['lemma_indicators']).long()
+        self.pos = torch.from_numpy(dataset['pos']).long()
+        self.ner = torch.from_numpy(dataset['ner']).long()
 
         if use_v2:
             # SQuAD 2.0: Use index 0 for no-answer token (token 1 = OOV)
@@ -72,6 +74,10 @@ class SQuAD(data.Dataset):
             zeros = torch.ones((batch_size, 1), dtype=torch.int64)
             self.em_indicators = torch.cat((zeros, self.em_indicators), dim=1)
             self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
+
+            ones = torch.ones((batch_size, 1, w_len), dtype=torch.int64)
+            self.pos = torch.cat((ones, self.pos), dim=1)
+            self.ner = torch.cat((ones, self.ner), dim=1)
 
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
@@ -115,6 +121,8 @@ class SQuAD(data.Dataset):
                 #    self.compute_context_word_features(idx),
                    self.em_indicators[idx],
                    self.lemma_indicators[idx])
+                   self.pos[idx],
+                   self.ner[idx])
                    # self.compute_question_word_features(idx))
 
         return example
@@ -163,7 +171,7 @@ def collate_fn(examples):
     # Group by tensor type
     context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
-        y1s, y2s, ids, cwf, lemma_indicators = zip(*examples)
+        y1s, y2s, ids, cwf, lemma_indicators, pos, ner = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
@@ -176,10 +184,12 @@ def collate_fn(examples):
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
+    pos = merge_2d(pos)
+    ner = merge_2d(ner)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
-            y1s, y2s, ids, cwf, lemma_indicators)
+            y1s, y2s, ids, cwf, lemma_indicators, pos, ner)
 
 
 class AverageMeter:
