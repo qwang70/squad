@@ -7,7 +7,7 @@ from collections import Counter
 nlp = spacy.load('en')
 
 # data_paths = ['train_tiny.npz']#, 'data/train.npz', 'data/test.npz', 'data/dev.npz']
-data_paths = ['data/train.npz', 'data/test.npz']
+data_paths = ['data/dev.npz', 'data/train.npz', 'data/test.npz']
 output_file = 'data/frequent.json'
 
 
@@ -81,7 +81,7 @@ def get_pos_ner(eval_file, ids_set):
                     ner[idx, start:(end+1), ner_idx] = 1
                 else:
                     print("ner out",num, ent.text, ent.label_, token_span, start, end)
-    return pos, ner
+    return np.concatenate((pos, ner), axis=2)
 
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
@@ -132,24 +132,24 @@ with open("data/idx2word.json") as f:
         # pos, ner
         print("pos, ner...")
         eval_file = '{}_eval.json'.format(data_path.split('.')[0])
-        pos, ner = get_pos_ner(eval_file, {*dataset['ids']})
+        context_posner = get_pos_ner(eval_file, {*dataset['ids']})
 
         # init EM mat
         print("EM init...")
-        em_indicators = np.zeros(context_idxs.shape)
+        em_indicators = np.zeros((context_idxs.shape[0], context_idxs.shape[1], 2))
         for idx, row in enumerate(context_idxs):
             if idx % 1000 == 0:
                 print(idx)
             for j, word in enumerate(row):
                 if word != 0:
                     if word in question_idxs[idx]:
-                        em_indicators[idx, j] = 1
+                        em_indicators[idx, j, 0] = 1
                     else:
-                        em_indicators[idx, j] = -1
+                        em_indicators[idx, j, 0] = -1
 
         # init lemma mat
         print("lemma init...")
-        lemma_indicators = np.zeros(context_idxs.shape)
+
         pos_num = np.zeros(context_idxs.shape)
         for idx, row in enumerate(question_idxs):
             lemma_list = []
@@ -172,11 +172,12 @@ with open("data/idx2word.json") as f:
                     for token in tokens:
                         pos_num[idx, col_idx] = pos_dict[token.pos_]
                         if token.lemma_ not in ''',.''' and token.lemma_.lower() in lemma_list:
-                            lemma_indicators[idx, col_idx] = 1
+                            em_indicators[idx, col_idx, 1] = 1
                             break
                         else:
-                            lemma_indicators[idx, col_idx] = -1
+                            em_indicators[idx, col_idx, 1] = -1
 
+        # features = np.concatenate([em_indicators, posner], axis=2)
         outfile = '{}_features.npz'.format(data_path.split('.')[0])
         print(outfile, "saving...")
         np.savez(outfile, context_idxs=dataset['context_idxs'],\
@@ -186,10 +187,9 @@ with open("data/idx2word.json") as f:
             y1s=dataset['y1s'],\
             y2s=dataset['y2s'],\
             ids=dataset['ids'],\
-            em_indicators=em_indicators,\
-            lemma_indicators=lemma_indicators,\
-            pos = pos,\
-            ner = ner
+            #features = features
+            em=em_indicators,\
+            context_posner=context_posner
             )
 
 
