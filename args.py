@@ -207,6 +207,9 @@ def add_common_args(parser):
     parser.add_argument('--enable_EM',
                         type=bool,
                         default=True)
+    parser.add_argument('--enable_posner',
+                        type=bool,
+                        default=True)
 
 
 def add_train_test_args(parser):

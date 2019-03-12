@@ -53,8 +53,8 @@ class SQuAD(data.Dataset):
         self.y2s = torch.from_numpy(dataset['y2s']).long()
         self.em_indicators = torch.from_numpy(dataset['em_indicators']).long()
         self.lemma_indicators = torch.from_numpy(dataset['lemma_indicators']).long()
-        self.pos = torch.from_numpy(dataset['pos']).long()
-        self.ner = torch.from_numpy(dataset['ner']).long()
+        self.c_posner = torch.from_numpy(dataset['c_posner']).long()
+        self.q_posner = torch.from_numpy(dataset['q_posner']).long()
 
         if use_v2:
             # SQuAD 2.0: Use index 0 for no-answer token (token 1 = OOV)
@@ -76,8 +76,8 @@ class SQuAD(data.Dataset):
             self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
 
             ones = torch.ones((batch_size, 1, w_len), dtype=torch.int64)
-            self.pos = torch.cat((ones, self.pos), dim=1)
-            self.ner = torch.cat((ones, self.ner), dim=1)
+            self.c_posner = torch.cat((ones, self.c_posner), dim=1)
+            self.q_posner = torch.cat((ones, self.q_posner), dim=1)
 
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
@@ -117,13 +117,10 @@ class SQuAD(data.Dataset):
                    self.y2s[idx],
                    self.ids[idx],
                    # additional features
-                   #get word features
-                #    self.compute_context_word_features(idx),
                    self.em_indicators[idx],
                    self.lemma_indicators[idx])
-                   self.pos[idx],
-                   self.ner[idx])
-                   # self.compute_question_word_features(idx))
+                   self.c_posner[idx],
+                   self.q_posner[idx])
 
         return example
 
@@ -171,7 +168,7 @@ def collate_fn(examples):
     # Group by tensor type
     context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
-        y1s, y2s, ids, cwf, lemma_indicators, pos, ner = zip(*examples)
+        y1s, y2s, ids, cwf, lemma_indicators, c_posner, q_posner = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
@@ -184,12 +181,12 @@ def collate_fn(examples):
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
-    pos = merge_2d(pos)
-    ner = merge_2d(ner)
+    c_posner = merge_2d(c_posner)
+    q_posner = merge_2d(q_posner)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
-            y1s, y2s, ids, cwf, lemma_indicators, pos, ner)
+            y1s, y2s, ids, cwf, lemma_indicators, c_posner, q_posner)
 
 
 class AverageMeter:

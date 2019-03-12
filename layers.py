@@ -24,18 +24,23 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob, enable_posner=None):
         super(Embedding, self).__init__()
+        if enable_posner is not None:
+            self.posner_embed = nn.Embedding(35, 10)
+            self.output_size = 2 * hidden_size + 10
+        else:
+            self.output_size = 2 * hidden_size
         self.drop_prob = drop_prob
         self.char_embed = CharEmbedding(char_vectors=char_vectors,
                                         hidden_size=hidden_size,
                                         drop_prob=drop_prob) 
         self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        self.hwy = HighwayEncoder(2, 2 * hidden_size)
+        self.hwy = HighwayEncoder(2, self.output_size)
         self.embed_size = hidden_size
 
-    def forward(self, c_idxs, w_idxs):
+    def forward(self, c_idxs, w_idxs, posner=None):
         # word_embedding
         word_emb = self.word_embed(w_idxs)   # (batch_size, seq_len, embed_size)
         word_emb = F.dropout(word_emb, self.drop_prob, self.training)
@@ -44,10 +49,15 @@ class Embedding(nn.Module):
         # char_embedding
         char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, embed_size)
         assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
-        emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
-        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
+        if posner is not None:
+            # posner embedding
+            posner_emb = self.posner_embed(posner)
+            emb = torch.cat((char_emb, word_emb, posner_emb), 2) # (batch_size, seq_len, 2 * embed_size + 10)
+        else:
+            emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), self.output_size)
         emb = self.hwy(emb)   # (batch_size, seq_len, 2 * embed_size)
-        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), self.output_size)
 
         return emb
 

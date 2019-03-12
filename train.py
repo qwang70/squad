@@ -49,7 +49,8 @@ def main(args):
     log.info('Building model...')
     model = BiDAF(word_vectors=word_vectors, char_vectors=char_vectors,
                   hidden_size=args.hidden_size,
-                  drop_prob=args.drop_prob, enable_EM=args.enable_EM)
+                  drop_prob=args.drop_prob, 
+                  enable_EM=args.enable_EM, enable_posner=args.enable_posner)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info('Loading checkpoint from {}...'.format(args.load_path))
