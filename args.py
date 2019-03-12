@@ -107,7 +107,7 @@ def get_train_args():
                         help='L2 weight decay.')
     parser.add_argument('--num_epochs',
                         type=int,
-                        default=30,
+                        default=15,
                         help='Number of epochs for which to train. Negative means forever.')
     parser.add_argument('--drop_prob',
                         type=float,
@@ -221,7 +221,7 @@ def add_train_test_args(parser):
                         help='Name to identify training or test run.')
     parser.add_argument('--max_ans_len',
                         type=int,
-                        default=15,
+                        default=12,
                         help='Maximum length of a predicted answer.')
     parser.add_argument('--num_workers',
                         type=int,

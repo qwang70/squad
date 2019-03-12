@@ -226,7 +226,7 @@ with open("data/idx2word.json") as f:
         # features = np.concatenate([em_indicators, posner], axis=2)
         outfile = '{}_features'.format(data_path.split('.')[0])
         print(outfile, "saving...")
-        np.savez_compressed(outfile, context_idxs=dataset['context_idxs'],\
+        saveCompressed(outfile, context_idxs=dataset['context_idxs'],\
             context_char_idxs = dataset['context_char_idxs'],\
             ques_idxs = dataset['ques_idxs'],\
             ques_char_idxs=dataset['ques_char_idxs'],\
