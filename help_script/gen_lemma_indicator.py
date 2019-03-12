@@ -136,20 +136,20 @@ with open("data/idx2word.json") as f:
 
         # init EM mat
         print("EM init...")
-        em_indicators = np.zeros((context_idxs.shape[0], context_idxs.shape[1], 2))
+        em_indicators = np.zeros(context_idxs.shape)
         for idx, row in enumerate(context_idxs):
             if idx % 1000 == 0:
                 print(idx)
             for j, word in enumerate(row):
                 if word != 0:
                     if word in question_idxs[idx]:
-                        em_indicators[idx, j, 0] = 1
+                        em_indicators[idx, j] = 1
                     else:
-                        em_indicators[idx, j, 0] = -1
+                        em_indicators[idx, j] = -1
 
         # init lemma mat
         print("lemma init...")
-
+        lemma_indicators = np.zeros(context_idxs.shape)
         pos_num = np.zeros(context_idxs.shape)
         for idx, row in enumerate(question_idxs):
             lemma_list = []
@@ -172,11 +172,10 @@ with open("data/idx2word.json") as f:
                     for token in tokens:
                         pos_num[idx, col_idx] = pos_dict[token.pos_]
                         if token.lemma_ not in ''',.''' and token.lemma_.lower() in lemma_list:
-                            em_indicators[idx, col_idx, 1] = 1
+                            lemma_indicators[idx, col_idx] = 1
                             break
                         else:
-                            em_indicators[idx, col_idx, 1] = -1
-
+							lemma_indicators[idx, col_idx] = -1
         # features = np.concatenate([em_indicators, posner], axis=2)
         outfile = '{}_features.npz'.format(data_path.split('.')[0])
         print(outfile, "saving...")
@@ -188,7 +187,8 @@ with open("data/idx2word.json") as f:
             y2s=dataset['y2s'],\
             ids=dataset['ids'],\
             #features = features
-            em=em_indicators,\
+            em_indicators=em_indicators,\
+            lemma_indicators=lemma_indicators,\
             context_posner=context_posner
             )
 
