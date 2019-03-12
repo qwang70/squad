@@ -29,7 +29,7 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0.):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0., enable_selfatt=True):
         super(BiDAF, self).__init__()
         self.embd_size = hidden_size
         self.d = self.embd_size * 2+1 # word_embedding + char_embedding + word_feature
@@ -46,13 +46,15 @@ class BiDAF(nn.Module):
         self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
 
-        # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
-        #                                  drop_prob=drop_prob)
-        self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
-                        input_size = 2 * self.d, attention_size = 2 * self.d,
-                        drop_prob=drop_prob)
+        self.enable_selfatt = enable_selfatt
+        if enable_selfatt:
+            # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
+            #                                  drop_prob=drop_prob)
+            self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
+                            input_size = 2 * self.d, attention_size = 6 * self.d,
+                            drop_prob=drop_prob)
 
-        self.mod = layers.RNNEncoder(input_size=2 * self.d,
+        self.mod = layers.RNNEncoder(input_size=6 * self.d,
                                      hidden_size=self.d,
                                      num_layers=2,
                                      drop_prob=drop_prob)
@@ -90,12 +92,14 @@ class BiDAF(nn.Module):
                        c_mask, q_mask)    # (batch_size, c_len, 2 * d)
         assert att.size(2) == 2 * self.d
 
-        # selfMatch = self.selfMatch(att)
-        selfMatch = self.selfMatch(att, att, c_mask)
-        assert selfMatch.size(2) == 2 * self.d
+        if self.enable_selfatt:
+            self_match = self.selfMatch(att, att, c_mask)
+        else:
+            self_match = att
+        #assert att.size(2) == 2 * self.d
 
-        mod = self.mod(selfMatch, c_len)        # (batch_size, c_len, 2 * d)
-        assert mod.size(2) == 2 * self.d
+        mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
+        #assert mod.size(2) == 2 * self.d
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
 

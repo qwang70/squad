@@ -315,7 +315,7 @@ class SelfMatcher(nn.Module):
 
 # https://github.com/matthew-z/R-net/blob/master/modules/pair_encoder/attentions.py
 class StaticDotAttention(nn.Module):
-    def __init__(self, memory_size, input_size, attention_size,  drop_prob=0.2):
+    def __init__(self, memory_size, input_size, attention_size,  drop_prob):
         super(StaticDotAttention, self).__init__()
         self.input_linear = nn.Sequential(
             RNNDropout(drop_prob, batch_first=True),
@@ -329,7 +329,7 @@ class StaticDotAttention(nn.Module):
             nn.ReLU()
         )
         self.output_linear = nn.Sequential(
-            nn.Linear(3 * attention_size, attention_size, bias=True),
+            nn.Linear(3 * input_size, attention_size, bias=True),
             nn.ReLU()
         )
         self.attention_size = attention_size
@@ -339,7 +339,7 @@ class StaticDotAttention(nn.Module):
         input_ = self.input_linear(inputs)
         memory_ = self.memory_linear(memory)
 
-        logits = torch.bmm(input_, memory_.transpose(2, 1)) / (self.attention_size ** 0.5) # S
+        logits = torch.bmm(input_, memory_.transpose(2, 1)) #/ (self.attention_size ** 0.5) # S
 
         memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
         score = masked_softmax(logits, memory_mask, dim=-1)     # a
