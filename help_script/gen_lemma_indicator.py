@@ -2,7 +2,17 @@ import numpy as np
 import spacy
 import json
 from collections import Counter
+import zipfile
+import io
 
+def saveCompressed(fh, **namedict):
+     with zipfile.ZipFile(fh, mode="w", compression=zipfile.ZIP_DEFLATED,
+                          allowZip64=True) as zf:
+         for k, v in namedict.items():
+             with zf.open(k + '.npy', 'w', force_zip64=True) as buf:
+                 np.lib.npyio.format.write_array(buf,
+                                                 np.asanyarray(v),
+                                                 allow_pickle=False)
 # load spacy model
 nlp = spacy.load('en')
 
@@ -214,9 +224,9 @@ with open("data/idx2word.json") as f:
                         else:
                             lemma_indicators[idx, col_idx] = -1
         # features = np.concatenate([em_indicators, posner], axis=2)
-        outfile = '{}_features.npz'.format(data_path.split('.')[0])
+        outfile = '{}_features'.format(data_path.split('.')[0])
         print(outfile, "saving...")
-        np.savez(outfile, context_idxs=dataset['context_idxs'],\
+        np.savez_compressed(outfile, context_idxs=dataset['context_idxs'],\
             context_char_idxs = dataset['context_char_idxs'],\
             ques_idxs = dataset['ques_idxs'],\
             ques_char_idxs=dataset['ques_char_idxs'],\
