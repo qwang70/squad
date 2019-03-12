@@ -317,6 +317,14 @@ class SelfMatcher(nn.Module):
 class StaticDotAttention(nn.Module):
     def __init__(self, memory_size, input_size, attention_size,  drop_prob):
         super(StaticDotAttention, self).__init__()
+        
+        # 224n winner uses BiLSTM
+
+        self.rnn = RNNEncoder(input_size=input_size,
+                              hidden_size=input_size,
+                              num_layers=1,
+                              drop_prob=drop_prob)
+        # code online uses a normal network
         self.input_linear = nn.Sequential(
             RNNDropout(drop_prob, batch_first=True),
             nn.Linear(input_size, attention_size, bias=False),
@@ -336,17 +344,23 @@ class StaticDotAttention(nn.Module):
 
     def forward(self, inputs, memory, memory_mask):
 
+        # archi from 224n winner
+        input_ = self.rnn(inputs)
+        logits = torch.bmm(input_, input_.transpose(2, 1)) #/ (self.attention_size ** 0.5) # S
+        """
+        # code online uses linear relu
         input_ = self.input_linear(inputs)
         memory_ = self.memory_linear(memory)
-
         logits = torch.bmm(input_, memory_.transpose(2, 1)) #/ (self.attention_size ** 0.5) # S
+        """
+
 
         memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
         score = masked_softmax(logits, memory_mask, dim=-1)     # a
 
         context = torch.bmm(score, memory)                      # m
-        new_input = torch.cat([context, inputs, context * inputs], dim=-1)
-        output = self.output_linear(new_input)
+        new_input = torch.cat([context, input_, context * input_], dim=-1)
+        output = inputs + self.output_linear(new_input)
 
         return output
 
