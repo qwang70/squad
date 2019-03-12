@@ -35,11 +35,13 @@ def find_overlapping_span(token_span, span):
                 break
     return (start, end)
 
-def get_pos_ner(eval_file, ids_set):
+def get_pos_ner(eval_file, ids_set, limit, limit2):
     with open(eval_file) as f:
         data = json.load(f)
-        pos = np.zeros((len(ids_set), 400, len(pos_dict)))
-        ner = np.zeros((len(ids_set), 400, len(ner_dict)))
+        c_pos = np.zeros((len(ids_set), limit, len(pos_dict)))
+        c_ner = np.zeros((len(ids_set), limit, len(ner_dict)))
+        q_pos = np.zeros((len(ids_set), limit2, len(pos_dict)))
+        q_ner = np.zeros((len(ids_set), limit2, len(ner_dict)))
 
         offset = 1
         for num in data:
@@ -52,6 +54,9 @@ def get_pos_ner(eval_file, ids_set):
                 print(idx)
             context = data[num]['context']
             span = data[num]['spans']
+            question = data[num]['question']
+            ques_span = data[num]['ques_spans']
+            # context 
             doc = nlp(context)
             # pos
             for token in doc:
@@ -64,8 +69,8 @@ def get_pos_ner(eval_file, ids_set):
                 # print("token span", token_span)
                 start, end = find_overlapping_span(token_span, span)
                 # print(start, end)
-                if start >= 0 and end >= 0 and start < 400 and end < 400:
-                    pos[idx, start:(end+1), pos_idx] = 1
+                if start >= 0 and end >= 0 and start < limit and end < limit:
+                    c_pos[idx, start:(end+1), pos_idx] = 1
                 else:
                     print("pos out", num, token.text, token.pos_, token_span, start, end)
             # ner
@@ -77,11 +82,43 @@ def get_pos_ner(eval_file, ids_set):
                 # print(ent.text, ent.label_, ner_idx)
                 
                 start, end = find_overlapping_span(token_span, span)
-                if start >= 0 and end >= 0 and start < 400 and end < 400:
-                    ner[idx, start:(end+1), ner_idx] = 1
+                if start >= 0 and end >= 0 and start < limit and end < limit:
+                    c_ner[idx, start:(end+1), ner_idx] = 1
                 else:
                     print("ner out",num, ent.text, ent.label_, token_span, start, end)
-    return np.concatenate((pos, ner), axis=2)
+
+            # question
+            doc = nlp(question)
+            # pos
+            for token in doc:
+                if token.pos_ not in poses:
+                    continue
+                pos_idx = pos_dict[token.pos_]
+                # print(token.text, token.pos_, token.pos)
+                token_span = (token.idx, token.idx + len(token.text))
+                # print(context)
+                # print("token span", token_span)
+                start, end = find_overlapping_span(token_span, ques_span)
+                # print(start, end)
+                if start >= 0 and end >= 0 and start < limit2 and end < limit2:
+                    q_pos[idx, start:(end+1), pos_idx] = 1
+                else:
+                    print("q pos out", num, token.text, token.pos_, token_span, start, end)
+            # ner
+            for ent in doc.ents:
+                if ent.label_ not in ners:
+                    continue
+                token_span = (ent.start_char, ent.end_char)
+                ner_idx = ner_dict[ent.label_]
+                # print(ent.text, ent.label_, ner_idx)
+                
+                start, end = find_overlapping_span(token_span, ques_span)
+                if start >= 0 and end >= 0 and start < limit2 and end < limit2:
+                    q_ner[idx, start:(end+1), ner_idx] = 1
+                else:
+                    print("ner out",num, ent.text, ent.label_, token_span, start, end)
+    return np.concatenate((c_pos, c_ner), axis=2),  np.concatenate((q_pos, q_ner), axis=2)
+
 
 def compute_top_question_words(question_idxs, output_file, num_top = 20):
     word_count = Counter()
@@ -132,7 +169,7 @@ with open("data/idx2word.json") as f:
         # pos, ner
         print("pos, ner...")
         eval_file = '{}_eval.json'.format(data_path.split('.')[0])
-        context_posner = get_pos_ner(eval_file, {*dataset['ids']})
+        context_posner, question_posner = get_pos_ner(eval_file, {*dataset['ids']}, context_idxs.shape[1], question_idxs.shape[1])
 
         # init EM mat
         print("EM init...")
@@ -175,7 +212,7 @@ with open("data/idx2word.json") as f:
                             lemma_indicators[idx, col_idx] = 1
                             break
                         else:
-							lemma_indicators[idx, col_idx] = -1
+                            lemma_indicators[idx, col_idx] = -1
         # features = np.concatenate([em_indicators, posner], axis=2)
         outfile = '{}_features.npz'.format(data_path.split('.')[0])
         print(outfile, "saving...")
@@ -189,7 +226,8 @@ with open("data/idx2word.json") as f:
             #features = features
             em_indicators=em_indicators,\
             lemma_indicators=lemma_indicators,\
-            context_posner=context_posner
+            c_posner=context_posner, \
+            q_posner=question_posner
             )
 
 
