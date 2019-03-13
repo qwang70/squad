@@ -121,7 +121,6 @@ def main(args):
                 lemma_indicators = lemma_indicators.to(device)
                 c_posner = c_posner.to(device)
                 q_posner = q_posner.to(device)
-                print("train", c_posner.dtype)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
 

@@ -7,6 +7,7 @@ Author:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from ujson import load as json_load
 
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -51,9 +52,7 @@ class Embedding(nn.Module):
         assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
         if posner is not None:
             # posner embedding
-            print("layer", posner.dtype)
-            posner_emb = self.posner_embed(posner)
-            print(char_emb.shape, word_emb.shape, posner_emb.shape)
+            posner_emb = self.posner_embed(posner.float())
             emb = torch.cat((char_emb, word_emb, posner_emb), 2) # (batch_size, seq_len, 2 * embed_size + 10)
         else:
             emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
@@ -333,9 +332,10 @@ class StaticDotAttention(nn.Module):
         # 224n winner uses BiLSTM
 
         self.rnn = RNNEncoder(input_size=input_size,
-                              hidden_size=input_size,
+                              hidden_size=int(input_size/2),
                               num_layers=1,
                               drop_prob=drop_prob)
+        """
         # code online uses a normal network
         self.input_linear = nn.Sequential(
             RNNDropout(drop_prob, batch_first=True),
@@ -348,17 +348,26 @@ class StaticDotAttention(nn.Module):
             nn.Linear(memory_size, attention_size, bias=False),
             nn.ReLU()
         )
+        """
         self.output_linear = nn.Sequential(
             nn.Linear(3 * input_size, attention_size, bias=True),
             nn.ReLU()
         )
         self.attention_size = attention_size
+        self.c_weight = nn.Parameter(torch.zeros(input_size, 1))
+        self.q_weight = nn.Parameter(torch.zeros(input_size, 1))
+        self.cq_weight = nn.Parameter(torch.zeros(1, 1, input_size))
+        for weight in (self.c_weight, self.q_weight, self.cq_weight):
+            nn.init.xavier_uniform_(weight)
+        self.bias = nn.Parameter(torch.zeros(1))
 
     def forward(self, inputs, memory, memory_mask):
 
         # archi from 224n winner
-        input_ = self.rnn(inputs)
-        logits = torch.bmm(input_, input_.transpose(2, 1)) #/ (self.attention_size ** 0.5) # S
+        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 2d)
+        assert input_.shape == inputs.shape
+        logits = self.get_similarity_matrix(input_, input_) # (batch, c_len, c_len)
+        assert logits.shape == (input_.size(0), input_.size(1), input_.size(1))
         """
         # code online uses linear relu
         input_ = self.input_linear(inputs)
@@ -369,12 +378,28 @@ class StaticDotAttention(nn.Module):
 
         memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
         score = masked_softmax(logits, memory_mask, dim=-1)     # a
+        quit()
 
         context = torch.bmm(score, memory)                      # m
         new_input = torch.cat([context, input_, context * input_], dim=-1)
         output = inputs + self.output_linear(new_input)
 
         return output
+    def get_similarity_matrix(self, c, q):
+        c_len, q_len = c.size(1), q.size(1)
+
+        # Shapes: (batch_size, c_len, q_len)
+        s0 = torch.matmul(c, self.c_weight).expand([-1, -1, q_len])
+        s1 = torch.matmul(q, self.q_weight).transpose(1, 2)\
+                                           .expand([-1, c_len, -1])
+        s2 = torch.matmul(c * self.cq_weight, q.transpose(1, 2))
+        s = s0 + s1 + s2 + self.bias
+        eye = torch.from_numpy(np.repeat([np.diagflat(np.ones(c_len)*np.NINF)],c.size(0),axis=0)).to(s.device).float()
+        s = s + eye
+        print("param", self.c_weight.data)
+
+        return s
+
 
 # https://github.com/matthew-z/R-net/blob/master/modules/dropout.py
 class RNNDropout(nn.Module):

@@ -183,7 +183,6 @@ def collate_fn(examples):
     ids = merge_0d(ids)
     c_posner = merge_2d(c_posner, dtype=torch.long)
     q_posner = merge_2d(q_posner, dtype=torch.long)
-    print(c_posner.dtype)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
