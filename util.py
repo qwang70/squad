@@ -75,7 +75,7 @@ class SQuAD(data.Dataset):
             self.em_indicators = torch.cat((zeros, self.em_indicators), dim=1)
             self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
 
-            ones = torch.ones((batch_size, 1, w_len), dtype=torch.int64)
+            ones = torch.ones((batch_size, 1, self.c_posner.size(2)), dtype=torch.long)
             self.c_posner = torch.cat((ones, self.c_posner), dim=1)
             self.q_posner = torch.cat((ones, self.q_posner), dim=1)
 
@@ -181,8 +181,9 @@ def collate_fn(examples):
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
-    c_posner = merge_2d(c_posner)
-    q_posner = merge_2d(q_posner)
+    c_posner = merge_2d(c_posner, dtype=torch.long)
+    q_posner = merge_2d(q_posner, dtype=torch.long)
+    print(c_posner.dtype)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
