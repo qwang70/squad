@@ -51,6 +51,10 @@ class SQuAD(data.Dataset):
         self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
         self.y1s = torch.from_numpy(dataset['y1s']).long()
         self.y2s = torch.from_numpy(dataset['y2s']).long()
+        self.em_indicators = torch.from_numpy(dataset['em_indicators']).long()
+        self.lemma_indicators = torch.from_numpy(dataset['lemma_indicators']).long()
+        self.c_posner = torch.from_numpy(dataset['c_posner']).long()
+        self.q_posner = torch.from_numpy(dataset['q_posner']).long()
 
         if use_v2:
             # SQuAD 2.0: Use index 0 for no-answer token (token 1 = OOV)
@@ -65,6 +69,15 @@ class SQuAD(data.Dataset):
 
             self.y1s += 1
             self.y2s += 1
+
+            # additional features
+            zeros = torch.zeros((batch_size, 1), dtype=torch.int64)
+            self.em_indicators = torch.cat((zeros, self.em_indicators), dim=1)
+            self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
+
+            zeros = torch.zeros((batch_size, 1, self.c_posner.size(2)), dtype=torch.int64)
+            self.c_posner = torch.cat((zeros, self.c_posner), dim=1)
+            self.q_posner = torch.cat((zeros, self.q_posner), dim=1)
 
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
@@ -103,9 +116,11 @@ class SQuAD(data.Dataset):
                    self.y1s[idx],
                    self.y2s[idx],
                    self.ids[idx],
-                   #get word features
-                   self.compute_context_word_features(idx))
-                   # self.compute_question_word_features(idx))
+                   # additional features
+                   self.em_indicators[idx],
+                   self.lemma_indicators[idx],
+                   self.c_posner[idx],
+                   self.q_posner[idx])
 
         return example
 
@@ -120,11 +135,11 @@ def collate_fn(examples):
 
     Args:
         examples (list): List of tuples of the form (context_idxs, context_char_idxs,
-        question_idxs, question_char_idxs, y1s, y2s, ids).
+        question_idxs, question_char_idxs, y1s, y2s, ids, cwf).
 
     Returns:
         examples (tuple): Tuple of tensors (context_idxs, context_char_idxs, question_idxs,
-        question_char_idxs, y1s, y2s, ids). All of shape (batch_size, ...), where
+        question_char_idxs, y1s, y2s, ids, cwf). All of shape (batch_size, ...), where
         the remaining dimensions are the maximum length of examples in the input.
 
     Adapted from:
@@ -140,6 +155,11 @@ def collate_fn(examples):
             end = lengths[i]
             padded[i, :end] = seq[:end]
         return padded
+    def copy_1d(arrays, end, dtype=torch.int64, pad_value=0):
+        padded = torch.zeros(len(arrays), end, dtype=dtype)
+        for i, seq in enumerate(arrays):
+            padded[i, :end] = seq[:end]
+        return padded
 
     def merge_2d(matrices, dtype=torch.int64, pad_value=0):
         heights = [(m.sum(1) != pad_value).sum() for m in matrices]
@@ -149,26 +169,34 @@ def collate_fn(examples):
             height, width = heights[i], widths[i]
             padded[i, :height, :width] = seq[:height, :width]
         return padded
+    def copy_2d(matrices, height, width, dtype=torch.int64):
+        padded = torch.zeros((len(matrices), height, width))
+        for i, seq in enumerate(matrices):
+            padded[i, :height, :width] = seq[:height, :width]
+        return padded
 
     # Group by tensor type
     context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
-        y1s, y2s, ids, cwf = zip(*examples)
+        y1s, y2s, ids, cwf, lemma_indicators, c_posner, q_posner = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
     context_char_idxs = merge_2d(context_char_idxs)
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
-    cwf = merge_1d(cwf)
+    cwf = copy_1d(cwf, context_idxs.size(1))
     #qwf = merge_1d(qwf)
+    lemma_indicators = copy_1d(lemma_indicators, context_idxs.size(1))
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
+    c_posner = copy_2d(c_posner, context_idxs.size(1), 35)
+    q_posner = copy_2d(q_posner, question_idxs.size(1), 35)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
-            y1s, y2s, ids, cwf)
+            y1s, y2s, ids, cwf, lemma_indicators, c_posner, q_posner)
 
 
 class AverageMeter:

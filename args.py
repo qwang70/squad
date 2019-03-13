@@ -107,7 +107,7 @@ def get_train_args():
                         help='L2 weight decay.')
     parser.add_argument('--num_epochs',
                         type=int,
-                        default=30,
+                        default=15,
                         help='Number of epochs for which to train. Negative means forever.')
     parser.add_argument('--drop_prob',
                         type=float,
@@ -120,7 +120,7 @@ def get_train_args():
                         help='Name of dev metric to determine best checkpoint.')
     parser.add_argument('--max_checkpoints',
                         type=int,
-                        default=5,
+                        default=2,
                         help='Maximum number of checkpoints to keep on disk.')
     parser.add_argument('--max_grad_norm',
                         type=float,
@@ -179,13 +179,16 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./data/train.npz')
+                        default='./data/train_features.npz')
+                        # default='./data/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./data/dev.npz')
+                        default='./data/dev_features.npz')
+                        # default='./data/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./data/test.npz')
+                        default='./data/test_features.npz')
+                        # default='./data/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
                         default='./data/word_emb.json')
@@ -201,6 +204,12 @@ def add_common_args(parser):
     parser.add_argument('--test_eval_file',
                         type=str,
                         default='./data/test_eval.json')
+    parser.add_argument('--enable_EM',
+                        type=bool,
+                        default=True)
+    parser.add_argument('--enable_posner',
+                        type=bool,
+                        default=True)
 
 
 def add_train_test_args(parser):
@@ -212,7 +221,7 @@ def add_train_test_args(parser):
                         help='Name to identify training or test run.')
     parser.add_argument('--max_ans_len',
                         type=int,
-                        default=15,
+                        default=12,
                         help='Maximum length of a predicted answer.')
     parser.add_argument('--num_workers',
                         type=int,
@@ -224,7 +233,7 @@ def add_train_test_args(parser):
                         help='Base directory for saving information.')
     parser.add_argument('--batch_size',
                         type=int,
-                        default=64,
+                        default=100,
                         help='Batch size per GPU. Scales automatically when \
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',

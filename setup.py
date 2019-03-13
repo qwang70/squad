@@ -112,6 +112,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                     ques = qa["question"].replace(
                         "''", '" ').replace("``", '" ')
                     ques_tokens = word_tokenize(ques)
+                    ques_spans = convert_idx(ques, ques_tokens)
                     ques_chars = [list(token) for token in ques_tokens]
                     for token in ques_tokens:
                         word_counter[token] += 1
@@ -142,6 +143,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                     eval_examples[str(total)] = {"context": context,
                                                  "question": ques,
                                                  "spans": spans,
+                                                 "ques_spans": ques_spans,
                                                  "answers": answer_texts,
                                                  "uuid": qa["id"]}
         print("{} questions in total".format(len(examples)))

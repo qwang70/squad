@@ -7,6 +7,7 @@ Author:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from ujson import load as json_load
 
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -24,18 +25,23 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob, enable_posner=None):
         super(Embedding, self).__init__()
+        if enable_posner is not None:
+            self.posner_embed = nn.Linear(35, 10)
+            self.output_size = 2 * hidden_size + 10
+        else:
+            self.output_size = 2 * hidden_size
         self.drop_prob = drop_prob
         self.char_embed = CharEmbedding(char_vectors=char_vectors,
                                         hidden_size=hidden_size,
                                         drop_prob=drop_prob) 
         self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        self.hwy = HighwayEncoder(2, 2 * hidden_size)
+        self.hwy = HighwayEncoder(2, self.output_size)
         self.embed_size = hidden_size
 
-    def forward(self, c_idxs, w_idxs):
+    def forward(self, c_idxs, w_idxs, posner=None):
         # word_embedding
         word_emb = self.word_embed(w_idxs)   # (batch_size, seq_len, embed_size)
         word_emb = F.dropout(word_emb, self.drop_prob, self.training)
@@ -44,10 +50,15 @@ class Embedding(nn.Module):
         # char_embedding
         char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, embed_size)
         assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
-        emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
-        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
+        if posner is not None:
+            # posner embedding
+            posner_emb = self.posner_embed(posner.float())
+            emb = torch.cat((char_emb, word_emb, posner_emb), 2) # (batch_size, seq_len, 2 * embed_size + 10)
+        else:
+            emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), self.output_size)
         emb = self.hwy(emb)   # (batch_size, seq_len, 2 * embed_size)
-        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), 2*self.embed_size)
+        assert emb.shape == (w_idxs.size(0), w_idxs.size(1), self.output_size)
 
         return emb
 
@@ -149,6 +160,11 @@ class BiDAFAttention(nn.Module):
         self.c_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.q_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.cq_weight = nn.Parameter(torch.zeros(1, 1, hidden_size))
+
+        self.linear_relu = nn.Sequential(
+            nn.Linear(4 * hidden_size, hidden_size, bias=True),
+            nn.ReLU()
+        )
         for weight in (self.c_weight, self.q_weight, self.cq_weight):
             nn.init.xavier_uniform_(weight)
         self.bias = nn.Parameter(torch.zeros(1))
@@ -168,7 +184,7 @@ class BiDAFAttention(nn.Module):
         b = torch.bmm(torch.bmm(s1, s2.transpose(1, 2)), c)
 
         x = torch.cat([c, a, c * a, c * b], dim=2)  # (bs, c_len, 4 * hid_size)
-
+        x = self.linear_relu(x)                     # (bs, c_len, hid_size)
         return x
 
     def get_similarity_matrix(self, c, q):
@@ -211,7 +227,7 @@ class BiDAFOutput(nn.Module):
     """
     def __init__(self, hidden_size, drop_prob):
         super(BiDAFOutput, self).__init__()
-        self.att_linear_1 = nn.Linear(8 * hidden_size, 1)
+        self.att_linear_1 = nn.Linear(2 * hidden_size, 1)
         self.mod_linear_1 = nn.Linear(2 * hidden_size, 1)
 
         self.rnn = RNNEncoder(input_size=2 * hidden_size,
@@ -219,7 +235,7 @@ class BiDAFOutput(nn.Module):
                               num_layers=1,
                               drop_prob=drop_prob)
 
-        self.att_linear_2 = nn.Linear(8 * hidden_size, 1)
+        self.att_linear_2 = nn.Linear(2 * hidden_size, 1)
         self.mod_linear_2 = nn.Linear(2 * hidden_size, 1)
 
     def forward(self, att, mod, mask):
@@ -248,39 +264,8 @@ class CharEmbedding(nn.Module):
         self.c_embd_size = char_vectors.size(1)
         self.kernel_size = 5
         self.conv = nn.Conv1d(self.c_embd_size, hidden_size, self.kernel_size, stride=1, padding=0)
-        """
-        filters = [[1,5]]
-        self.conv = nn.ModuleList([nn.Conv2d(1, hidden_size, (f[0], f[1])) for f in filters])
-        """
 
     def forward(self, x):
-        """
-        # x: (N, seq_len, word_len)
-        input_shape = x.size()
-        word_len = x.size(2)
-        x = x.view(-1, word_len) # (N*seq_len, word_len)
-        x = self.embedding(x) # (N*seq_len, word_len, c_embd_size)
-        x = x.view(*input_shape, -1) # (N, seq_len, word_len, c_embd_size)
-        x = x.sum(2) # (N, seq_len, c_embd_size)
-        # CNN
-        x = x.unsqueeze(1) # (N, Cin, seq_len, c_embd_size), insert Channnel-In dim
-        # Conv2d
-        #    Input : (N,Cin, Hin, Win )
-        #    Output: (N,Cout,Hout,Wout)
-        x = [F.relu(conv(x)) for conv in self.conv] # (N, Cout, seq_len, c_embd_size-filter_w+1). stride == 1
-        # [(N,Cout,Hout,Wout) -> [(N,Cout,Hout*Wout)] * len(filter_heights)
-
-        # [(N, seq_len, c_embd_size-filter_w+1, Cout)] * len(filter_heights)
-        x = [xx.view((xx.size(0), xx.size(2), xx.size(3), xx.size(1))) for xx in x]
-
-        # maxpool like
-        # [(N, seq_len, Cout)] * len(filter_heights)
-        x = [torch.sum(xx, 2) for xx in x]
-        # (N, seq_len, Cout==word_embd_size)
-        x = torch.cat(x, 1)
-        x = F.dropout(x, self.drop_prob, self.training)
-        return x
-        """
         # x: (N, seq_len, word_len)
         input_shape = x.size()
         word_len = x.size(2)
@@ -301,3 +286,134 @@ class CharEmbedding(nn.Module):
         x = x.view(input_shape[0], input_shape[1], self.hidden_size)
         return x 
 
+# https://github.com/hengruo/RNet-pytorch/blob/master/models.py
+# Input is question-aware passage representation
+# Output is self-attention question-aware passage representation
+class SelfMatcher(nn.Module):
+    def __init__(self, in_size, drop_prob):
+        super(SelfMatcher, self).__init__()
+        self.hidden_size = in_size
+        self.in_size = in_size
+        self.gru = nn.GRUCell(input_size=in_size, hidden_size=self.hidden_size)
+        self.Wp = nn.Linear(self.in_size, self.hidden_size, bias=False)
+        self.Wp_ = nn.Linear(self.in_size, self.hidden_size, bias=False)
+        self.out_size = self.hidden_size
+        self.dropout = nn.Dropout(p=drop_prob)
+
+    def forward(self, v):
+        (batch_size, l, _) = v.size()
+        v.permute([1,0,2])
+        h = torch.randn(batch_size, self.hidden_size).to(v.device)
+        V = torch.randn(batch_size, self.hidden_size, 1).to(v.device)
+        hs = torch.zeros(l, batch_size, self.out_size).to(v.device)
+        
+        for i in range(l):
+            Wpv = self.Wp(v[i])
+            Wpv_ = self.Wp_(v)
+            x = F.tanh(Wpv + Wpv_)
+            x = x.permute([1, 0, 2])
+            s = torch.bmm(x, V)
+            s = torch.squeeze(s, 2)
+            a = F.softmax(s, 1).unsqueeze(1)
+            c = torch.bmm(a, v.permute([1, 0, 2])).squeeze()
+            h = self.gru(c, h)
+            hs[i] = h
+            # logger.gpu_mem_log("SelfMatcher {:002d}".format(i), ['x', 'Wpv', 'Wpv_', 's', 'c', 'hs'], [x.data, Wpv.data, Wpv_.data, s.data, c.data, hs.data])
+            del Wpv, Wpv_, x, s, a, c
+        hs = self.dropout(hs)
+        del h, v
+        return hs
+
+# https://github.com/matthew-z/R-net/blob/master/modules/pair_encoder/attentions.py
+class StaticDotAttention(nn.Module):
+    def __init__(self, memory_size, input_size, attention_size,  drop_prob):
+        super(StaticDotAttention, self).__init__()
+        
+        # 224n winner uses BiLSTM
+
+        self.rnn = RNNEncoder(input_size=input_size,
+                              hidden_size=int(input_size/2),
+                              num_layers=1,
+                              drop_prob=drop_prob)
+        """
+        # code online uses a normal network
+        self.input_linear = nn.Sequential(
+            RNNDropout(drop_prob, batch_first=True),
+            nn.Linear(input_size, attention_size, bias=False),
+            nn.ReLU()
+        )
+
+        self.memory_linear = nn.Sequential(
+            RNNDropout(drop_prob, batch_first=True),
+            nn.Linear(memory_size, attention_size, bias=False),
+            nn.ReLU()
+        )
+        """
+        self.output_linear = nn.Sequential(
+            nn.Linear(3 * input_size, attention_size, bias=True),
+            nn.ReLU()
+        )
+        self.attention_size = attention_size
+        self.c_weight = nn.Parameter(torch.zeros(input_size, 1))
+        self.q_weight = nn.Parameter(torch.zeros(input_size, 1))
+        self.cq_weight = nn.Parameter(torch.zeros(1, 1, input_size))
+        for weight in (self.c_weight, self.q_weight, self.cq_weight):
+            nn.init.xavier_uniform_(weight)
+        self.bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self, inputs, memory, memory_mask):
+
+        # archi from 224n winner
+        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 2d +- 1 )
+        assert input_.shape == inputs.shape
+        logits = self.get_similarity_matrix(input_, input_) # (batch, c_len, c_len)
+        assert logits.shape == (input_.size(0), input_.size(1), input_.size(1))
+        """
+        # code online uses linear relu
+        input_ = self.input_linear(inputs)
+        memory_ = self.memory_linear(memory)
+        logits = torch.bmm(input_, memory_.transpose(2, 1)) #/ (self.attention_size ** 0.5) # S
+        """
+
+
+        memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
+        score = masked_softmax(logits, memory_mask, dim=-1)     # a
+        assert score.shape == logits.shape
+
+        context = torch.bmm(score, input_)                      # m
+        new_input = torch.cat([context, input_, context * input_], dim=-1)
+        output = inputs + self.output_linear(new_input)
+
+        return output
+    def get_similarity_matrix(self, c, q):
+        c_len, q_len = c.size(1), q.size(1)
+
+        # Shapes: (batch_size, c_len, q_len)
+        s0 = torch.matmul(c, self.c_weight).expand([-1, -1, q_len])
+        s1 = torch.matmul(q, self.q_weight).transpose(1, 2)\
+                                           .expand([-1, c_len, -1])
+        s2 = torch.matmul(c * self.cq_weight, q.transpose(1, 2))
+        s = s0 + s1 + s2 + self.bias
+        eye = torch.from_numpy(np.repeat([np.diagflat(np.ones(c_len)*np.NINF)],c.size(0),axis=0)).to(s.device).float()
+        #s = s + eye
+        #print("param", self.c_weight.data[:2])
+
+        return s
+
+
+# https://github.com/matthew-z/R-net/blob/master/modules/dropout.py
+class RNNDropout(nn.Module):
+    def __init__(self, p, batch_first=False):
+        super().__init__()
+        self.dropout = nn.Dropout(p)
+        self.batch_first = batch_first
+
+    def forward(self, inputs):
+
+        if not self.training:
+            return inputs
+        if self.batch_first:
+            mask = inputs.new_ones(inputs.size(0), 1, inputs.size(2), requires_grad=False)
+        else:
+            mask = inputs.new_ones(1, inputs.size(1), inputs.size(2), requires_grad=False)
+        return self.dropout(mask) * inputs
