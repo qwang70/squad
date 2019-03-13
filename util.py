@@ -71,13 +71,13 @@ class SQuAD(data.Dataset):
             self.y2s += 1
 
             # additional features
-            zeros = torch.ones((batch_size, 1), dtype=torch.int64)
+            zeros = torch.zeros((batch_size, 1), dtype=torch.int64)
             self.em_indicators = torch.cat((zeros, self.em_indicators), dim=1)
             self.lemma_indicators = torch.cat((zeros, self.lemma_indicators), dim=1)
 
-            ones = torch.ones((batch_size, 1, self.c_posner.size(2)), dtype=torch.long)
-            self.c_posner = torch.cat((ones, self.c_posner), dim=1)
-            self.q_posner = torch.cat((ones, self.q_posner), dim=1)
+            zeros = torch.zeros((batch_size, 1, self.c_posner.size(2)), dtype=torch.int64)
+            self.c_posner = torch.cat((zeros, self.c_posner), dim=1)
+            self.q_posner = torch.cat((zeros, self.q_posner), dim=1)
 
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
@@ -155,6 +155,11 @@ def collate_fn(examples):
             end = lengths[i]
             padded[i, :end] = seq[:end]
         return padded
+    def copy_1d(arrays, end, dtype=torch.int64, pad_value=0):
+        padded = torch.zeros(len(arrays), end, dtype=dtype)
+        for i, seq in enumerate(arrays):
+            padded[i, :end] = seq[:end]
+        return padded
 
     def merge_2d(matrices, dtype=torch.int64, pad_value=0):
         heights = [(m.sum(1) != pad_value).sum() for m in matrices]
@@ -162,6 +167,11 @@ def collate_fn(examples):
         padded = torch.zeros(len(matrices), max(heights), max(widths), dtype=dtype)
         for i, seq in enumerate(matrices):
             height, width = heights[i], widths[i]
+            padded[i, :height, :width] = seq[:height, :width]
+        return padded
+    def copy_2d(matrices, height, width, dtype=torch.int64):
+        padded = torch.zeros((len(matrices), height, width))
+        for i, seq in enumerate(matrices):
             padded[i, :height, :width] = seq[:height, :width]
         return padded
 
@@ -175,14 +185,14 @@ def collate_fn(examples):
     context_char_idxs = merge_2d(context_char_idxs)
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
-    cwf = merge_1d(cwf)
+    cwf = copy_1d(cwf, context_idxs.size(1))
     #qwf = merge_1d(qwf)
-    lemma_indicators = merge_1d(lemma_indicators)
+    lemma_indicators = copy_1d(lemma_indicators, context_idxs.size(1))
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
-    c_posner = merge_2d(c_posner, dtype=torch.long)
-    q_posner = merge_2d(q_posner, dtype=torch.long)
+    c_posner = copy_2d(c_posner, context_idxs.size(1), 35)
+    q_posner = copy_2d(q_posner, question_idxs.size(1), 35)
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,

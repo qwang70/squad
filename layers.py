@@ -364,7 +364,7 @@ class StaticDotAttention(nn.Module):
     def forward(self, inputs, memory, memory_mask):
 
         # archi from 224n winner
-        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 2d)
+        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 2d +- 1 )
         assert input_.shape == inputs.shape
         logits = self.get_similarity_matrix(input_, input_) # (batch, c_len, c_len)
         assert logits.shape == (input_.size(0), input_.size(1), input_.size(1))
@@ -378,9 +378,9 @@ class StaticDotAttention(nn.Module):
 
         memory_mask = memory_mask.unsqueeze(1).expand(-1, inputs.size(1), -1)
         score = masked_softmax(logits, memory_mask, dim=-1)     # a
-        quit()
+        assert score.shape == logits.shape
 
-        context = torch.bmm(score, memory)                      # m
+        context = torch.bmm(score, input_)                      # m
         new_input = torch.cat([context, input_, context * input_], dim=-1)
         output = inputs + self.output_linear(new_input)
 
@@ -395,8 +395,8 @@ class StaticDotAttention(nn.Module):
         s2 = torch.matmul(c * self.cq_weight, q.transpose(1, 2))
         s = s0 + s1 + s2 + self.bias
         eye = torch.from_numpy(np.repeat([np.diagflat(np.ones(c_len)*np.NINF)],c.size(0),axis=0)).to(s.device).float()
-        s = s + eye
-        print("param", self.c_weight.data)
+        #s = s + eye
+        #print("param", self.c_weight.data[:2])
 
         return s
 
