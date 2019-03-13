@@ -27,8 +27,8 @@ class Embedding(nn.Module):
     def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob, enable_posner=None):
         super(Embedding, self).__init__()
         if enable_posner is not None:
-            self.posner_embed = nn.Embedding(35, 10)
-            self.output_size = 2 * hidden_size + 10
+            #self.posner_embed = nn.Embedding(35, 10)
+            self.output_size = 2 * hidden_size + 35
         else:
             self.output_size = 2 * hidden_size
         self.drop_prob = drop_prob
@@ -51,7 +51,7 @@ class Embedding(nn.Module):
         assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
         if posner is not None:
             # posner embedding
-            posner_emb = self.posner_embed(posner)
+            posner_emb = posner #self.posner_embed(posner)
             emb = torch.cat((char_emb, word_emb, posner_emb), 2) # (batch_size, seq_len, 2 * embed_size + 10)
         else:
             emb = torch.cat((char_emb, word_emb), 2) # (batch_size, seq_len, 2 * embed_size)

@@ -118,7 +118,7 @@ class SQuAD(data.Dataset):
                    self.ids[idx],
                    # additional features
                    self.em_indicators[idx],
-                   self.lemma_indicators[idx])
+                   self.lemma_indicators[idx],
                    self.c_posner[idx],
                    self.q_posner[idx])
 
