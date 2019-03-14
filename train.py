@@ -117,11 +117,19 @@ def main(args):
                 qc_idxs = qc_idxs.to(device)
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
-                cwf = cwf.to(device)
-                #qwf = qwf.to(device)
-                lemma_indicators = lemma_indicators.to(device)
-                c_posner = c_posner.to(device)
-                q_posner = q_posner.to(device)
+                if args.enable_EM：
+                    cwf = cwf.to(device)
+                    #qwf = qwf.to(device)
+                    lemma_indicators = lemma_indicators.to(device)
+                else:
+                    cwf = None
+                    lemma_indicators = None
+                if args.enable_posner:
+                    c_posner = c_posner.to(device)
+                    q_posner = q_posner.to(device)
+                else:
+                    q_posner = None
+                    c_posner = None
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
 
@@ -194,11 +202,19 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             qc_idxs = qc_idxs.to(device)
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
-            cwf = cwf.to(device)
-            #qwf = qwf.to(device)
-            lemma_indicators = lemma_indicators.to(device)
-            c_posner = c_posner.to(device)
-            q_posner = q_posner.to(device)
+            if args.enable_EM：
+                cwf = cwf.to(device)
+                #qwf = qwf.to(device)
+                lemma_indicators = lemma_indicators.to(device)
+            else:
+                cwf = None
+                lemma_indicators = None
+            if args.enable_posner:
+                c_posner = c_posner.to(device)
+                q_posner = q_posner.to(device)
+            else:
+                q_posner = None
+                c_posner = None
             batch_size = cw_idxs.size(0)
 
             # Forward

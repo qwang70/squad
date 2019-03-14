@@ -185,14 +185,22 @@ def collate_fn(examples):
     context_char_idxs = merge_2d(context_char_idxs)
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
-    cwf = copy_1d(cwf, context_idxs.size(1))
-    #qwf = merge_1d(qwf)
-    lemma_indicators = copy_1d(lemma_indicators, context_idxs.size(1))
+    if args.enable_EM:
+        cwf = copy_1d(cwf, context_idxs.size(1))
+        #qwf = merge_1d(qwf)
+        lemma_indicators = copy_1d(lemma_indicators, context_idxs.size(1))
+    else:
+        cwf = None
+        lemma_indicators = None
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
-    c_posner = copy_2d(c_posner, context_idxs.size(1), 35)
-    q_posner = copy_2d(q_posner, question_idxs.size(1), 35)
+    if args.enable_posner:
+        c_posner = copy_2d(c_posner, context_idxs.size(1), 35)
+        q_posner = copy_2d(q_posner, question_idxs.size(1), 35)
+    else:
+        c_posner = None
+        q_posner = None
 
     return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
