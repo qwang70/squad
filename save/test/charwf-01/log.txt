@@ -1,0 +1,28 @@
+[03.07.19 23:22:47] Args: {
+    "batch_size": 64,
+    "char_emb_file": "./data/char_emb.json",
+    "dev_eval_file": "./data/dev_eval.json",
+    "dev_record_file": "./data/dev.npz",
+    "hidden_size": 100,
+    "load_path": "save/train/charwf-03/best.pth.tar",
+    "max_ans_len": 15,
+    "name": "charwf",
+    "num_visuals": 10,
+    "num_workers": 4,
+    "save_dir": "./save/test/charwf-01",
+    "split": "dev",
+    "sub_file": "submission.csv",
+    "test_eval_file": "./data/test_eval.json",
+    "test_record_file": "./data/test.npz",
+    "train_eval_file": "./data/train_eval.json",
+    "train_record_file": "./data/train.npz",
+    "use_squad_v2": true,
+    "word_emb_file": "./data/word_emb.json"
+}
+[03.07.19 23:22:47] Loading embeddings...
+[03.07.19 23:22:51] Building model...
+[03.07.19 23:22:54] Loading checkpoint from save/train/charwf-03/best.pth.tar...
+[03.07.19 23:22:54] Building dataset...
+[03.07.19 23:22:55] Evaluating on dev split...
+[03.07.19 23:23:45] Dev NLL: 02.81, F1: 63.07, EM: 59.89, AvNA: 69.94
+[03.07.19 23:23:46] Writing submission file to ./save/test/charwf-01/dev_submission.csv...

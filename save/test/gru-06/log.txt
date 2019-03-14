@@ -1,0 +1,24 @@
+[03.11.19 19:03:18] Args: {
+    "batch_size": 64,
+    "char_emb_file": "./data/char_emb.json",
+    "dev_eval_file": "./data/dev_eval.json",
+    "dev_record_file": "./data/dev_features.npz",
+    "enable_EM": true,
+    "hidden_size": 100,
+    "load_path": "/home/wangqiwen/squad/save/train/baseline_gru-02/best.pth.tar",
+    "max_ans_len": 15,
+    "name": "gru",
+    "num_visuals": 10,
+    "num_workers": 4,
+    "save_dir": "./save/test/gru-06",
+    "split": "dev",
+    "sub_file": "submission.csv",
+    "test_eval_file": "./data/test_eval.json",
+    "test_record_file": "./data/test_features.npz",
+    "train_eval_file": "./data/train_eval.json",
+    "train_record_file": "./data/train_features.npz",
+    "use_squad_v2": true,
+    "word_emb_file": "./data/word_emb.json"
+}
+[03.11.19 19:03:18] Loading embeddings...
+[03.11.19 19:03:22] Building model...

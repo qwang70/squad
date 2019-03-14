@@ -1,0 +1,28 @@
+[03.12.19 15:44:26] Args: {
+    "batch_size": 64,
+    "char_emb_file": "./data/char_emb.json",
+    "dev_eval_file": "./data/dev_eval.json",
+    "dev_record_file": "./data/dev.npz",
+    "hidden_size": 100,
+    "load_path": "save/train/selfatt-03/best.pth.tar",
+    "max_ans_len": 15,
+    "name": "selfatt",
+    "num_visuals": 10,
+    "num_workers": 4,
+    "save_dir": "./save/test/selfatt-01",
+    "split": "dev",
+    "sub_file": "submission.csv",
+    "test_eval_file": "./data/test_eval.json",
+    "test_record_file": "./data/test.npz",
+    "train_eval_file": "./data/train_eval.json",
+    "train_record_file": "./data/train.npz",
+    "use_squad_v2": true,
+    "word_emb_file": "./data/word_emb.json"
+}
+[03.12.19 15:44:26] Loading embeddings...
+[03.12.19 15:44:30] Building model...
+[03.12.19 15:44:33] Loading checkpoint from save/train/selfatt-03/best.pth.tar...
+[03.12.19 15:44:33] Building dataset...
+[03.12.19 15:44:34] Evaluating on dev split...
+[03.12.19 15:45:23] Dev NLL: 02.85, F1: 61.83, EM: 59.03, AvNA: 69.03
+[03.12.19 15:45:24] Writing submission file to ./save/test/selfatt-01/dev_submission.csv...

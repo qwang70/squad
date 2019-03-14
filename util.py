@@ -15,6 +15,10 @@ import torch.utils.data as data
 import tqdm
 import numpy as np
 import ujson as json
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+sns.set(style="white", palette="muted", color_codes=True)
 
 from collections import Counter
 
@@ -726,6 +730,89 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
         eval_dict['AvNA'] = 100. * avna / total
 
     return eval_dict
+
+def eval_dicts_stats(gold_dict, pred_dict, folder):
+    print(eval_dicts_stats)
+    question_words = ['which', 'what', 'whose', 'who', 'whom', 'where',  'when', 'how', 'why', 'is']
+    question_word_em = {}
+    question_word_f1 = {}
+    for q in question_words:
+        question_word_em[q] = []
+        question_word_f1[q] = []
+    answer_length_f1 = {}
+    for i in range(16):
+        answer_length_f1[i] = []
+    p_a = set()
+    p_n = set()
+    g_a = set()
+    g_n = set()
+    for key, value in pred_dict.items():
+        prediction = value
+        gold_answer = gold_dict[key]['answers']
+        question = gold_dict[key]['question']
+        f1 = metric_max_over_ground_truths(compute_f1, prediction, gold_answer)
+        em = metric_max_over_ground_truths(compute_em, prediction, gold_answer)
+        ans_len = []
+        for answer in gold_answer:
+            ans_len.append(len(answer.split()))
+        if len(ans_len) == 0:
+            answer_length = 0
+        else:
+            answer_length = int(sum(ans_len)/len(ans_len))
+        if answer_length < 16:
+            answer_length_f1[answer_length].append(f1)
+        qword = question.split()[0].lower()
+        if qword in question_words:
+            question_word_em[qword].append(em)
+            question_word_f1[qword].append(f1)
+        if bool(gold_answer):
+            g_a.add(key)
+        else:
+            g_n.add(key)
+        if bool(prediction):
+            p_a.add(key)
+        else:
+            p_n.add(key)
+    plot_question_word(question_word_f1, "F1", folder)
+    plot_question_word(question_word_em, "EM", folder)
+    plot_answer_length(answer_length_f1, folder)
+    tp = len(g_a.intersection(p_a))
+    fp = len(g_n.intersection(p_a))
+    tn = len(g_a.intersection(p_n))
+    fn = len(g_n.intersection(p_n))
+    precision = tp/(tp+fp)
+    recall = tp/(tp+fn)
+    f1 = 2*tp/(2*tp+fp+fn)
+    metrics_string = """
+    p_a:{}\tp_n:{}\tg_a:{}\tg_n:{}
+    tp:{}\tfp:{}\ttn:{}\tfn:{}
+    precision:{}\trecall:{}
+    f1:{}""".format(len(p_a), len(p_n), len(g_a), len(g_n), tp, fp, tn, fn, precision, recall, f1)
+    with open("{}/na_metrics.txt".format(folder), "w") as text_file:
+        text_file.write(metrics_string)
+
+def plot_answer_length(qdict, folder):
+    length_list = np.zeros(len(qdict))
+    for key,value in qdict.items():
+        length_list[key] = np.mean(np.array(value))
+    plt.figure()
+    plt.plot(length_list)
+    plt.xlabel("Gold Answer Length")
+    plt.ylabel("F1 of the Predicted Answers")
+    plt.savefig('{}/answer_length.png'.format(folder))
+
+def plot_question_word(qdict, ylabel, folder):
+    d = {}
+    for key,value in qdict.items():
+        d[key+str(len(value))]=np.mean(np.array(value))
+    x, y = zip(*sorted(d.items(), key=lambda kv: kv[1], reverse=True))
+    y_pos = np.arange(len(x))
+     
+    plt.figure()
+    plt.bar(y_pos, y, align='center', alpha=0.5)
+    plt.xticks(y_pos, x)
+    plt.ylabel(ylabel)
+    plt.savefig('{}/question_word_{}.png'.format(folder, ylabel))
 
 
 def compute_avna(prediction, ground_truths):
