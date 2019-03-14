@@ -117,7 +117,7 @@ def main(args):
                 qc_idxs = qc_idxs.to(device)
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
-                if args.enable_EM：
+                if args.enable_EM:
                     cwf = cwf.to(device)
                     #qwf = qwf.to(device)
                     lemma_indicators = lemma_indicators.to(device)
@@ -166,7 +166,9 @@ def main(args):
                     results, pred_dict = evaluate(model, dev_loader, device,
                                                   args.dev_eval_file,
                                                   args.max_ans_len,
-                                                  args.use_squad_v2)
+                                                  args.use_squad_v2,
+                                                  args.enable_EM,
+                                                  args.enable_posner)
                     saver.save(step, model, results[args.metric_name], device)
                     ema.resume(model)
 
@@ -187,7 +189,7 @@ def main(args):
                                    num_visuals=args.num_visuals)
 
 
-def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
+def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, enable_EM, enable_posner):
     nll_meter = util.AverageMeter()
 
     model.eval()
@@ -202,14 +204,14 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             qc_idxs = qc_idxs.to(device)
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
-            if args.enable_EM：
+            if enable_EM:
                 cwf = cwf.to(device)
                 #qwf = qwf.to(device)
                 lemma_indicators = lemma_indicators.to(device)
             else:
                 cwf = None
                 lemma_indicators = None
-            if args.enable_posner:
+            if enable_posner:
                 c_posner = c_posner.to(device)
                 q_posner = q_posner.to(device)
             else:
@@ -220,7 +222,9 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             # Forward
             log_p1, log_p2 = model(cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf, lemma_indicators, c_posner, q_posner)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+            weight = torch.ones(log_p1.size(1), device=device)
+            weight[0] = 5
+            loss = F.nll_loss(log_p1, y1, weight = weight) + F.nll_loss(log_p2, y2, weight = weight)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores
