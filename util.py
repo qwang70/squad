@@ -740,7 +740,7 @@ def eval_dicts_stats(gold_dict, pred_dict, folder):
         question_word_em[q] = []
         question_word_f1[q] = []
     answer_length_f1 = {}
-    for i in range(16):
+    for i in range(15):
         answer_length_f1[i] = []
     p_a = set()
     p_n = set()
@@ -759,7 +759,7 @@ def eval_dicts_stats(gold_dict, pred_dict, folder):
             answer_length = 0
         else:
             answer_length = int(sum(ans_len)/len(ans_len))
-        if answer_length < 16:
+        if answer_length < 15:
             answer_length_f1[answer_length].append(f1)
         qword = question.split()[0].lower()
         if qword in question_words:
