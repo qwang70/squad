@@ -29,7 +29,7 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0., enable_EM=True, enable_posner=True, enable_selfatt=True):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob=0., enable_EM=True, enable_posner=True, enable_selfatt=True, beta_selfatt=False):
         super(BiDAF, self).__init__()
         self.embd_size = hidden_size
         self.d = self.embd_size * 2 # word_embedding + char_embedding
@@ -47,16 +47,20 @@ class BiDAF(nn.Module):
                                      num_layers=1,
                                      drop_prob=drop_prob)
 
-        self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
-                                         drop_prob=drop_prob)
+        self.beta_selfatt = beta_selfatt
+        if beta_selfatt:
+            self.att = layers.GatedAttSelfMatch(hidden_size = self.d,batch_size = 1 )
+        else:
+            self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
+                                             drop_prob=drop_prob)
 
-        self.enable_selfatt = enable_selfatt
-        if enable_selfatt:
-            # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
-            #                                  drop_prob=drop_prob)
-            self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
-                            input_size = 2 * self.d, attention_size = 2 * self.d,
-                            drop_prob=drop_prob)
+            self.enable_selfatt = enable_selfatt
+            if enable_selfatt:
+                # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
+                #                                  drop_prob=drop_prob)
+                self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
+                                input_size = 2 * self.d, attention_size = 2 * self.d,
+                                drop_prob=drop_prob)
 
         self.mod = layers.RNNEncoder(input_size=2 * self.d,
                                      hidden_size=self.d,
@@ -95,7 +99,10 @@ class BiDAF(nn.Module):
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * d)
         assert c_enc.size(2) == 2 * self.d and q_enc.size(2) == 2 * self.d
 
-        att = self.att(c_enc, q_enc,
+        if self.beta_selfatt:
+            att = self.att(c_enc, q_enc)
+        else:
+            att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 2 * d)
         assert att.size(2) == 2 * self.d
 

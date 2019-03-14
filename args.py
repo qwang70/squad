@@ -213,6 +213,9 @@ def add_common_args(parser):
     parser.add_argument('--enable_selfatt',
                         type=bool,
                         default=True)
+    parser.add_argument('--beta_selfatt',
+                        type=bool,
+                        default=False)
 
 
 def add_train_test_args(parser):

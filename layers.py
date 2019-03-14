@@ -12,6 +12,7 @@ from ujson import load as json_load
 
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import masked_softmax
+from torch.autograd import Variable
 
 
 class Embedding(nn.Module):
@@ -417,3 +418,184 @@ class RNNDropout(nn.Module):
         else:
             mask = inputs.new_ones(1, inputs.size(1), inputs.size(2), requires_grad=False)
         return self.dropout(mask) * inputs
+class GatedAttSelfMatch(nn.Module):
+    ''' Simple GRU Encoder, converts words to embeddings if not using word embeddings
+        and then runs them through a 3 layer GRU cell, outputs a probability of the vocabulary,
+        adds the conv feature map as the hidden state
+    '''
+    def __init__(self,hidden_size=75,num_layers=3,batch_size=1):
+        super(GatedAttSelfMatch, self).__init__()
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.batch_size = batch_size
+        
+        #self.gru = nn.GRU(embed_size, hidden_size, num_layers=num_layers, batch_first=True,bidirectional=True,dropout=0.2)
+        #self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=num_layers, batch_first=True)
+
+
+        self.linear_passage = nn.Linear(hidden_size*2,hidden_size)
+        self.linear_question = nn.Linear(hidden_size*2,hidden_size)
+        self.linear_hidden = nn.Linear(hidden_size*2,hidden_size)
+        self.linear_vt = nn.Linear(hidden_size,hidden_size)
+        self.linear_vt_answer_rec = nn.Linear(hidden_size,1)
+        self.linear_self_passage_word = nn.Linear(hidden_size*2,hidden_size)
+        self.linear_self_passage = nn.Linear(hidden_size*2,hidden_size)
+
+        self.linear_h_p = nn.Linear(hidden_size*2,hidden_size)
+        self.linear_h_a = nn.Linear(hidden_size,hidden_size)
+
+        self.gated_attention = nn.Linear(hidden_size*3,hidden_size*3)
+        self.gated_attention_self_matching = nn.Linear(hidden_size*3,hidden_size*3)
+
+        self.tanh = nn.Tanh()
+
+        self.gated_attention_rnn = nn.GRU(hidden_size*3, hidden_size, num_layers=1, batch_first=True, bidirectional=True,dropout=0.2) # bidirectional input + c_t of 75 size = 150+75 = 225
+        self.gated_attention_self_matching_rnn = nn.GRU(hidden_size*3, hidden_size, num_layers=1, batch_first=True,bidirectional=True,dropout=0.2) # passage word size + c_t = 55 + 75 = 150 
+        
+
+        self.init_weights()
+        self.hidden_qa_passage = self.initHiddenUtil(layers=1)
+        print("qa_passage", self.hidden_qa_passage.shape, self.hidden_qa_passage.device)
+        self.hidden_self_matching = self.initHiddenUtil(layers=1)
+
+    def init_weights(self): 
+        '''Initialize the weights'''
+        for m in self.modules():
+            if isinstance(m,nn.Linear):
+                m.weight.data.uniform_(-0.1, 0.1)
+                m.bias.data.fill_(0)
+            elif isinstance(m,nn.Embedding):
+                m.weight.data.uniform_(-0.1, 0.1)
+
+    def gated_attn(self,passage_word,question):
+        
+
+        last_hidden = self.hidden_qa_passage
+        last_hidden = torch.cat((last_hidden[0,:,:],last_hidden[1,:,:]),dim=1)
+
+        print("last hidden", last_hidden.shape, last_hidden.device)
+        print("passage word", passage_word.shape)
+        h = self.linear_hidden(last_hidden)
+        print("h", h.shape)
+        p = self.linear_passage(passage_word)
+        print("p", p.shape)
+        q = self.linear_question(question)
+        print("question", question.shape)
+        print("q", q.shape)
+
+        a_t = F.softmax(self.linear_vt(self.tanh(q + h + p))) # stj = vt*tanh(question, passage_word, last_hidden_layer) ; a_t = sigmoid(s_t)
+        c_t = torch.sum(a_t*q,dim=1) # 1,75
+        
+
+        final_inp = torch.cat((passage_word,c_t),dim=1)
+
+        gate = F.sigmoid(self.gated_attention(final_inp))
+        gated_input = (final_inp*gate).unsqueeze(1)
+
+
+        x,self.hidden_qa_passage = self.gated_attention_rnn(gated_input,self.hidden_qa_passage)
+        h = self.hidden_qa_passage
+        h = torch.cat((h[0,:,:],h[1,:,:]),dim=1)
+
+        return h
+    
+    def self_matching_attn(self,passage_word,passage):
+
+        last_hidden = self.hidden_self_matching
+        last_hidden = torch.cat((last_hidden[0,:,:],last_hidden[1,:,:]),dim=1)
+
+        p_w = self.linear_self_passage_word(passage_word)
+        p = self.linear_self_passage(passage)
+        inp = p + p_w
+
+        a_t = F.softmax(self.linear_vt(self.tanh(p + p_w))) # stj = vt*tanh(passage,passage_word) ; a_t = sigmoid(s_t)
+        c_t = torch.sum(a_t*p,dim=1)
+        
+        final_inp = torch.cat((passage_word,c_t),dim=1)
+        gate = F.sigmoid(self.gated_attention_self_matching(final_inp))
+        gated_input = (final_inp*gate).unsqueeze(1)
+
+        x,self.hidden_self_matching = self.gated_attention_self_matching_rnn(gated_input,self.hidden_self_matching)
+
+        h = self.hidden_self_matching
+        h = torch.cat((h[0,:,:],h[1,:,:]),dim=1)
+        
+        return h
+
+    def build_question_aware_passage(self,passage,question):
+        passage_words = passage.size(1)
+        v = None
+        for i in range(passage_words):
+            passage_word = passage[:,i,:]
+            x = self.gated_attn(passage_word,question)
+            
+            if isinstance(v,torch.autograd.Variable):
+                v = torch.cat((v,x),dim=0)
+            else:
+                v = x
+        
+        v = v.unsqueeze(0)
+        return v
+    
+    def build_self_matching_attention(self,passage_1,passage_2):
+        passage_words = passage_1.size(1)
+        h = None
+        for i in range(passage_words):
+            passage_word = passage_1[:,i,:]
+            x = self.self_matching_attn(passage_word,passage_2)
+            
+            if isinstance(h,torch.autograd.Variable):
+                h = torch.cat((h,x),dim=0)
+            else:
+                h = x
+
+        h = h.unsqueeze(0)
+        return h
+    
+
+    def forward(self,u_p, u_q):
+        
+        v = self.build_question_aware_passage(u_p,u_q)
+        print("v build question aware passage", v.shape)
+        h = self.build_self_matching_attention(v,v)
+        print("h self matching attention", h.shape)
+
+        return h
+    
+        
+        
+    def initHiddenUtil(self,layers):
+        # multiplied by 2 as all rnns are bi directional presently
+        if torch.cuda.is_available():
+            return Variable(torch.zeros(layers*2,self.batch_size,self.hidden_size).cuda())
+        else:
+            return Variable(torch.zeros(layers*2,self.batch_size,self.hidden_size))
+   
+"""
+class GatedAttentionRNN(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(GatedAttentionRNN, self).__init__()
+        self.rnn = nn.GRU(input_size, hidden_size )
+        self.WuQ_weight = nn.Parameter(torch.zeros(hidden_size, 1))
+        self.WuP_weight = nn.Parameter(torch.zeros(hidden_size, 1))
+        self.WvP_weight = nn.Parameter(torch.zeros(hidden_size, 1))
+        self.V = nn.Parameter(torch.zeros(input_size, 1))
+        self.linear_relu = nn.Sequential(
+            nn.Linear(4 * hidden_size, hidden_size, bias=True),
+            nn.ReLU()
+        )
+        for weight in (self.WuQ_weight, self.WuP_weight, self.WvP_weight, self.V):
+            nn.init.xavier_uniform_(weight)
+        self.bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self, c, q, c_mask, q_mask):
+        batch_size, c_len, _ = c.size()
+        q_len = q.size(1)
+        c_mask = c_mask.view(batch_size, c_len, 1)  # (batch_size, c_len, 1)
+        q_mask = q_mask.view(batch_size, 1, q_len)  # (batch_size, 1, q_len)
+
+        nn.tanh(torch.matmul(WuQ_weight, q_mask) 
+                + torch.matmul(WuP_weight, c_mask) 
+                + torch.matmul(WvP, V)
+"""
