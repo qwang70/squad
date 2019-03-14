@@ -733,7 +733,7 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
 
 def eval_dicts_stats(gold_dict, pred_dict, folder):
     print(eval_dicts_stats)
-    question_words = ['which', 'what', 'whose', 'who', 'whom', 'where',  'when', 'how', 'why', 'is']
+    question_words = ['which', 'what', 'whose', 'who', 'where',  'when', 'how', 'why']
     question_word_em = {}
     question_word_f1 = {}
     for q in question_words:
@@ -783,7 +783,8 @@ def eval_dicts_stats(gold_dict, pred_dict, folder):
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
     f1 = 2*tp/(2*tp+fp+fn)
-    metrics_string = """
+    metrics_string = """p_a: predicted has answer. p_n: predicted no answer. g_a: golden has answer. g_n goldern no answer
+    tp: predicted has answer ^ golden has answer.
     p_a:{}\tp_n:{}\tg_a:{}\tg_n:{}
     tp:{}\tfp:{}\ttn:{}\tfn:{}
     precision:{}\trecall:{}
@@ -804,14 +805,14 @@ def plot_answer_length(qdict, folder):
 def plot_question_word(qdict, ylabel, folder):
     d = {}
     for key,value in qdict.items():
-        d[key+str(len(value))]=np.mean(np.array(value))
+        d['{}({})'.format(key, str(len(value)))]=np.mean(np.array(value))
     x, y = zip(*sorted(d.items(), key=lambda kv: kv[1], reverse=True))
     y_pos = np.arange(len(x))
      
-    plt.figure()
-    plt.bar(y_pos, y, align='center', alpha=0.5)
-    plt.xticks(y_pos, x)
-    plt.ylabel(ylabel)
+    plt.figure(figsize=(8, 6))
+    plt.barh(y_pos, y, align='center', alpha=0.5)
+    plt.yticks(y_pos, x)
+    plt.xlabel(ylabel)
     plt.savefig('{}/question_word_{}.png'.format(folder, ylabel))
 
 
