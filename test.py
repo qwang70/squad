@@ -80,7 +80,7 @@ def main(args):
             qc_idxs = qc_idxs.to(device)
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
-            if args.enable_EM：
+            if args.enable_EM:
                 cwf = cwf.to(device)
                 #qwf = qwf.to(device)
                 lemma_indicators = lemma_indicators.to(device)
