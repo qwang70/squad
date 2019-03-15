@@ -211,6 +211,21 @@ class BiDAFAttention(nn.Module):
 
         return s
 
+#https://github.com/hackiey/QAnet-pytorch/blob/master/qanet/depthwise_separable_conv.py
+class DepthwiseSeparableConv1d(nn.Module):
+
+    def __init__(self, n_filters=128, kernel_size=7, padding=3):
+        super(DepthwiseSeparableConv1d, self).__init__()
+
+        self.depthwise = nn.Conv1d(n_filters, n_filters, kernel_size=kernel_size, padding=padding, groups=n_filters)
+        self.separable = nn.Conv1d(n_filters, n_filters, kernel_size=1)
+
+    def forward(self, x):
+        x = self.depthwise(x)
+        x = self.separable(x)
+
+        return x
+
 #https://github.com/hackiey/QAnet-pytorch/blob/master/qanet/self_attention.py
 class SelfAttention(nn.Module):
 
@@ -227,11 +242,15 @@ class SelfAttention(nn.Module):
         self.fc_key = nn.ModuleList([nn.Linear(n_filters, self.key_dim) for i in range(n_heads)])
         self.fc_value = nn.ModuleList([nn.Linear(n_filters, self.value_dim) for i in range(n_heads)])
         self.fc_out = nn.Linear(n_heads * self.value_dim, n_filters)
+        self.conv = nn.ModuleList([DepthwiseSeparableConv1d(n_filters,
+                                                            kernel_size=7,
+                                                            padding=3) for i in range(1)])
 
     def forward(self, x, mask):
         batch_size = x.shape[0]
         l = x.shape[1]
-
+        x = F.relu(self.conv[0](x))
+        
         mask = mask.unsqueeze(-1).expand(x.shape[0], x.shape[1], x.shape[1]).permute(0,2,1)
 
         heads = torch.zeros(self.n_heads, batch_size, l, self.value_dim, device=x.device)
