@@ -46,15 +46,15 @@ class BiDAF(nn.Module):
                                      hidden_size=self.d,
                                      num_layers=1,
                                      drop_prob=drop_prob)
-
+        self.enable_selfatt = enable_selfatt
         self.beta_selfatt = beta_selfatt
         if beta_selfatt:
             self.att = layers.GatedAttSelfMatch(hidden_size = self.d)
+            self.enable_selfatt = False
         else:
             self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                              drop_prob=drop_prob)
 
-            self.enable_selfatt = enable_selfatt
             if enable_selfatt:
                 # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
                 #                                  drop_prob=drop_prob)

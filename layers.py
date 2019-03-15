@@ -548,9 +548,7 @@ class GatedAttSelfMatch(nn.Module):
     def forward(self,u_p, u_q):
         
         v = self.build_question_aware_passage(u_p,u_q)
-        print("v build question aware passage", v.shape)
         h = self.build_self_matching_attention(v,v)
-        print("h self matching attention", h.shape)
 
         return h
     
