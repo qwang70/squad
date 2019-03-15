@@ -474,17 +474,11 @@ class GatedAttSelfMatch(nn.Module):
         last_hidden = self.hidden_qa_passage
         last_hidden = torch.cat((last_hidden[0,:,:],last_hidden[1,:,:]),dim=1)
 
-        print("last hidden", last_hidden.shape, last_hidden.device)
-        print("passage word", passage_word.shape)
         h = self.linear_hidden(last_hidden)
-        print("h", h.shape)
         p = self.linear_passage(passage_word)
-        print("p", p.shape)
         q = self.linear_question(question)
-        print("question", question.shape)
-        print("q", q.shape)
 
-        a_t = F.softmax(self.linear_vt(self.tanh(q + h + p))) # stj = vt*tanh(question, passage_word, last_hidden_layer) ; a_t = sigmoid(s_t)
+        a_t = F.softmax(self.linear_vt(self.tanh(q + h.unsqueeze(1) + p.unsqueeze(1)))) # stj = vt*tanh(question, passage_word, last_hidden_layer) ; a_t = sigmoid(s_t)
         c_t = torch.sum(a_t*q,dim=1) # 1,75
         
 
