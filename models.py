@@ -51,9 +51,9 @@ class BiDAF(nn.Module):
                                          drop_prob=drop_prob)
 
         #multihead selfattention implemented in QANet
-        self.enable_selfMultiHead = enable_selfMultiHead
-        if enable_selfMultiHead:
-            self.selfMultiHead = layers.SelfAttention(n_heads=1, n_filters=128)
+        # self.enable_selfMultiHead = enable_selfMultiHead
+        # if enable_selfMultiHead:
+        self.selfMultiHead = layers.SelfAttention(n_heads=1, n_filters=128)
 
         self.enable_selfatt = enable_selfatt
         if enable_selfatt:
@@ -110,10 +110,7 @@ class BiDAF(nn.Module):
             self_match = att
         #assert att.size(2) == 2 * self.d
 
-        if self.enable_selfMultiHead:
-            self_multi = self.multihead(att,c_mask)
-        else:
-            self_multi = att
+        self_multi = self.multihead(att,c_mask)
 
         mod = self.mod(self_multi, c_len)        # (batch_size, c_len, 2 * d)
         #assert mod.size(2) == 2 * self.d
