@@ -1,4 +1,4 @@
-[03.15.19 02:56:17] Args: {
+[03.15.19 02:52:32] Args: {
     "batch_size": 100,
     "char_emb_file": "./data/char_emb.json",
     "dev_eval_file": "./data/dev_eval.json",
@@ -7,12 +7,12 @@
     "enable_posner": true,
     "enable_selfatt": true,
     "hidden_size": 100,
-    "load_path": "save/train/posner_selfatt-02/best.pth.tar",
+    "load_path": "save/train/char_emb-03/best.pth.tar",
     "max_ans_len": 12,
-    "name": "em_posner_selfatt_ep10",
+    "name": "char_emb_ep15",
     "num_visuals": 10,
     "num_workers": 4,
-    "save_dir": "./save/test/em_posner_selfatt_ep10-01",
+    "save_dir": "./save/test/char_emb_ep15-01",
     "split": "dev",
     "sub_file": "submission.csv",
     "test_eval_file": "./data/test_eval.json",
@@ -22,10 +22,10 @@
     "use_squad_v2": true,
     "word_emb_file": "./data/word_emb.json"
 }
-[03.15.19 02:56:17] Loading embeddings...
-[03.15.19 02:56:21] Building model...
-[03.15.19 02:56:25] Loading checkpoint from save/train/posner_selfatt-02/best.pth.tar...
-[03.15.19 02:56:26] Building dataset...
-[03.15.19 02:56:30] Evaluating on dev split...
-[03.15.19 02:57:06] Dev NLL: 02.72, F1: 64.71, EM: 61.47, AvNA: 70.95
-[03.15.19 02:57:07] Writing submission file to ./save/test/em_posner_selfatt_ep10-01/dev_submission.csv...
+[03.15.19 02:52:32] Loading embeddings...
+[03.15.19 02:52:36] Building model...
+[03.15.19 02:52:41] Loading checkpoint from save/train/char_emb-03/best.pth.tar...
+[03.15.19 02:52:41] Building dataset...
+[03.15.19 02:52:45] Evaluating on dev split...
+[03.15.19 02:53:21] Dev NLL: 02.76, F1: 65.12, EM: 62.11, AvNA: 71.42
+[03.15.19 02:53:22] Writing submission file to ./save/test/char_emb_ep15-01/dev_submission.csv...
