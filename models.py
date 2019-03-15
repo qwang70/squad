@@ -112,8 +112,10 @@ class BiDAF(nn.Module):
 
         if self.enable_selfMultiHead:
             self_multi = self.multihead(att,c_mask)
+        else:
+            self_multi = att
 
-        mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
+        mod = self.mod(self_multi, c_len)        # (batch_size, c_len, 2 * d)
         #assert mod.size(2) == 2 * self.d
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
