@@ -49,7 +49,7 @@ class BiDAF(nn.Module):
 
         self.beta_selfatt = beta_selfatt
         if beta_selfatt:
-            self.att = layers.GatedAttSelfMatch(hidden_size = self.d,batch_size = 100 )
+            self.att = layers.GatedAttSelfMatch(hidden_size = self.d)
         else:
             self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                              drop_prob=drop_prob)
@@ -100,6 +100,7 @@ class BiDAF(nn.Module):
         assert c_enc.size(2) == 2 * self.d and q_enc.size(2) == 2 * self.d
 
         if self.beta_selfatt:
+            self.att.initHidden(q_enc)
             att = self.att(c_enc, q_enc)
         else:
             att = self.att(c_enc, q_enc,

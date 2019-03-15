@@ -14,7 +14,6 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import masked_softmax
 from torch.autograd import Variable
 
-
 class Embedding(nn.Module):
     """Embedding layer used by BiDAF, without the character-level component.
 
@@ -418,17 +417,18 @@ class RNNDropout(nn.Module):
         else:
             mask = inputs.new_ones(1, inputs.size(1), inputs.size(2), requires_grad=False)
         return self.dropout(mask) * inputs
+
+#https://github.com/karanchahal/pytorch-rnet/blob/master/encoder.py
 class GatedAttSelfMatch(nn.Module):
     ''' Simple GRU Encoder, converts words to embeddings if not using word embeddings
         and then runs them through a 3 layer GRU cell, outputs a probability of the vocabulary,
         adds the conv feature map as the hidden state
     '''
-    def __init__(self,hidden_size=75,num_layers=3,batch_size=1):
+    def __init__(self,hidden_size=75,num_layers=3):
         super(GatedAttSelfMatch, self).__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.batch_size = batch_size
         
         #self.gru = nn.GRU(embed_size, hidden_size, num_layers=num_layers, batch_first=True,bidirectional=True,dropout=0.2)
         #self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=num_layers, batch_first=True)
@@ -455,9 +455,6 @@ class GatedAttSelfMatch(nn.Module):
         
 
         self.init_weights()
-        self.hidden_qa_passage = self.initHiddenUtil(layers=1)
-        print("qa_passage", self.hidden_qa_passage.shape, self.hidden_qa_passage.device)
-        self.hidden_self_matching = self.initHiddenUtil(layers=1)
 
     def init_weights(self): 
         '''Initialize the weights'''
@@ -492,7 +489,7 @@ class GatedAttSelfMatch(nn.Module):
         h = self.hidden_qa_passage
         h = torch.cat((h[0,:,:],h[1,:,:]),dim=1)
 
-        return h
+        return h.unsqueeze(1)
     
     def self_matching_attn(self,passage_word,passage):
 
@@ -501,9 +498,9 @@ class GatedAttSelfMatch(nn.Module):
 
         p_w = self.linear_self_passage_word(passage_word)
         p = self.linear_self_passage(passage)
-        inp = p + p_w
+        inp = p + p_w.unsqueeze(1)
 
-        a_t = F.softmax(self.linear_vt(self.tanh(p + p_w))) # stj = vt*tanh(passage,passage_word) ; a_t = sigmoid(s_t)
+        a_t = F.softmax(self.linear_vt(self.tanh(inp))) # stj = vt*tanh(passage,passage_word) ; a_t = sigmoid(s_t)
         c_t = torch.sum(a_t*p,dim=1)
         
         final_inp = torch.cat((passage_word,c_t),dim=1)
@@ -515,7 +512,7 @@ class GatedAttSelfMatch(nn.Module):
         h = self.hidden_self_matching
         h = torch.cat((h[0,:,:],h[1,:,:]),dim=1)
         
-        return h
+        return h.unsqueeze(1)
 
     def build_question_aware_passage(self,passage,question):
         passage_words = passage.size(1)
@@ -525,11 +522,11 @@ class GatedAttSelfMatch(nn.Module):
             x = self.gated_attn(passage_word,question)
             
             if isinstance(v,torch.autograd.Variable):
-                v = torch.cat((v,x),dim=0)
+                v = torch.cat((v,x),dim=1)
             else:
                 v = x
         
-        v = v.unsqueeze(0)
+    #v = v.unsqueeze(0)
         return v
     
     def build_self_matching_attention(self,passage_1,passage_2):
@@ -540,11 +537,11 @@ class GatedAttSelfMatch(nn.Module):
             x = self.self_matching_attn(passage_word,passage_2)
             
             if isinstance(h,torch.autograd.Variable):
-                h = torch.cat((h,x),dim=0)
+                h = torch.cat((h,x),dim=1)
             else:
                 h = x
 
-        h = h.unsqueeze(0)
+        #h = h.unsqueeze(0)
         return h
     
 
@@ -557,6 +554,10 @@ class GatedAttSelfMatch(nn.Module):
 
         return h
     
+    def initHidden(self, q):
+        self.batch_size = q.size(0)
+        self.hidden_qa_passage = self.initHiddenUtil(layers=1)
+        self.hidden_self_matching = self.initHiddenUtil(layers=1)
         
         
     def initHiddenUtil(self,layers):
