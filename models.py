@@ -7,6 +7,7 @@ Author:
 import layers
 import torch
 import torch.nn as nn
+import attention
 
 
 class BiDAF(nn.Module):
@@ -48,19 +49,21 @@ class BiDAF(nn.Module):
                                      drop_prob=drop_prob)
         self.enable_selfatt = enable_selfatt
         self.beta_selfatt = beta_selfatt
-        if beta_selfatt:
-            self.att = layers.GatedAttSelfMatch(hidden_size = self.d)
-            self.enable_selfatt = False
-        else:
-            self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
-                                             drop_prob=drop_prob)
+        self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
+                                            drop_prob=drop_prob)
 
-            if enable_selfatt:
-                # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
-                #                                  drop_prob=drop_prob)
-                self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
-                                input_size = 2 * self.d, attention_size = 2 * self.d,
-                                drop_prob=drop_prob)
+        if beta_selfatt:
+            self.selfMatch = attention.GoalNetwork(input_dim = 2 * self.d, query_dim = 2 * self.d, 
+                 embedding_dim = 2 * self.d, num_hidden = 2 * self.d,
+                 output_features = 2 * self.d, activation = nn.ReLU(), use_additive=False, use_token2token=None,
+                 use_self_attn=True)
+            self.enable_selfatt = False
+        elif enable_selfatt:
+            # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
+            #                                  drop_prob=drop_prob)
+            self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
+                            input_size = 2 * self.d, attention_size = 2 * self.d,
+                            drop_prob=drop_prob)
 
         self.mod = layers.RNNEncoder(input_size=2 * self.d,
                                      hidden_size=self.d,
@@ -99,15 +102,12 @@ class BiDAF(nn.Module):
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * d)
         assert c_enc.size(2) == 2 * self.d and q_enc.size(2) == 2 * self.d
 
-        if self.beta_selfatt:
-            self.att.initHidden(q_enc)
-            att = self.att(c_enc, q_enc)
-        else:
-            att = self.att(c_enc, q_enc,
-                       c_mask, q_mask)    # (batch_size, c_len, 2 * d)
+        att = self.att(c_enc, q_enc, c_mask, q_mask)    # (batch_size, c_len, 2 * d)
         assert att.size(2) == 2 * self.d
 
-        if self.enable_selfatt:
+        if self.beta_selfatt:
+            self_match = self.selfMatch(att, att)
+        elif self.enable_selfatt:
             self_match = self.selfMatch(att, att, c_mask)
         else:
             self_match = att
