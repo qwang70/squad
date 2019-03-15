@@ -53,7 +53,7 @@ class BiDAF(nn.Module):
         #multihead selfattention implemented in QANet
         # self.enable_selfMultiHead = enable_selfMultiHead
         # if enable_selfMultiHead:
-        self.selfMultiHead = layers.SelfAttention(n_heads=1, n_filters=128)
+        self.selfMultiHead = layers.SelfAttention(n_heads=1, n_filters=32)
 
         self.enable_selfatt = enable_selfatt
         if enable_selfatt:

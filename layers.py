@@ -214,7 +214,7 @@ class BiDAFAttention(nn.Module):
 #https://github.com/hackiey/QAnet-pytorch/blob/master/qanet/self_attention.py
 class SelfAttention(nn.Module):
 
-    def __init__(self, n_heads=1, n_filters=128):
+    def __init__(self, n_heads=1, n_filters=32):
         super(SelfAttention, self).__init__()
 
         self.n_filters = n_filters
