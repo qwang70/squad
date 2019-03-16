@@ -25,9 +25,10 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob, enable_posner=None):
+    def __init__(self, word_vectors, char_vectors, hidden_size, drop_prob, enable_posner=False):
         super(Embedding, self).__init__()
-        if enable_posner is not None:
+        self.enable_posner = enable_posner
+        if enable_posner:
             self.posner_embed = nn.Linear(35, 10)
             self.output_size = 2 * hidden_size + 10
         else:
@@ -50,7 +51,7 @@ class Embedding(nn.Module):
         # char_embedding
         char_emb = self.char_embed(c_idxs) # (batch_size, seq_len, embed_size)
         assert char_emb.shape == (w_idxs.size(0), w_idxs.size(1), self.embed_size)
-        if posner is not None:
+        if self.enable_posner:
             # posner embedding
             posner_emb = self.posner_embed(posner.float())
             emb = torch.cat((char_emb, word_emb, posner_emb), 2) # (batch_size, seq_len, 2 * embed_size + 10)
@@ -394,9 +395,9 @@ class StaticDotAttention(nn.Module):
                                            .expand([-1, c_len, -1])
         s2 = torch.matmul(c * self.cq_weight, q.transpose(1, 2))
         s = s0 + s1 + s2 + self.bias
-        eye = torch.from_numpy(np.repeat([np.diagflat(np.ones(c_len)*np.NINF)],c.size(0),axis=0)).to(s.device).float()
-        #s = s + eye
-        #print("param", self.c_weight.data[:2])
+        eye = torch.from_numpy(np.repeat([np.diagflat(np.ones(c_len)*(-10000000))],c.size(0),axis=0)).to(s.device).float()
+        s = s + eye
+        #quit()
 
         return s
 

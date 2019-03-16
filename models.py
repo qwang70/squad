@@ -58,10 +58,15 @@ class BiDAF(nn.Module):
                             input_size = 2 * self.d, attention_size = 2 * self.d,
                             drop_prob=drop_prob)
 
-        self.mod = layers.RNNEncoder(input_size=2 * self.d,
-                                     hidden_size=self.d,
-                                     num_layers=2,
-                                     drop_prob=drop_prob)
+            self.mod = layers.RNNEncoder(input_size=4 * self.d,
+                                         hidden_size=self.d,
+                                         num_layers=2,
+                                         drop_prob=drop_prob)
+        else:
+            self.mod = layers.RNNEncoder(input_size=2 * self.d,
+                                         hidden_size=self.d,
+                                         num_layers=2,
+                                         drop_prob=drop_prob)
 
         self.out = layers.BiDAFOutput(hidden_size=self.d,
                                       drop_prob=drop_prob)
@@ -100,14 +105,15 @@ class BiDAF(nn.Module):
         assert att.size(2) == 2 * self.d
 
         if self.enable_selfatt:
-            self_match = self.selfMatch(att, att, c_mask)
+            self_match = self.selfMatch(c_enc, c_enc, c_mask)
+            assert att.size(2) == 2 * self.d
+
+            mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
+            out = self.out(att, mod, c_mask)
         else:
-            self_match = att
-        #assert att.size(2) == 2 * self.d
-
-        mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
-        #assert mod.size(2) == 2 * self.d
-
-        out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
+            mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
+            #assert mod.size(2) == 2 * self.d
+            out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
+    
 
         return out
