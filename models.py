@@ -55,8 +55,8 @@ class BiDAF(nn.Module):
         if enable_selfatt:
             self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
-            
-            self.mod = layers.RNNEncoder(input_size=2 * self.d,
+
+            self.mod = layers.RNNEncoder(input_size=4 * self.d,
                                          hidden_size=self.d,
                                          num_layers=2,
                                          drop_prob=drop_prob)
