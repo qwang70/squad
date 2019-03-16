@@ -56,18 +56,13 @@ class BiDAF(nn.Module):
             self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
                             input_size = 2 * self.d, attention_size = 2 * self.d,
                             drop_prob=drop_prob)
-
-            self.mod = layers.RNNEncoder(input_size=4 * self.d,
-                                         hidden_size=self.d,
-                                         num_layers=2,
-                                         drop_prob=drop_prob)
                                          
-        self.mod = layers.RNNEncoder(input_size=2 * self.d,
-                                         hidden_size=self.d,
-                                         num_layers=2,
-                                         drop_prob=drop_prob)
+        # self.mod = layers.RNNEncoder(input_size=2 * self.d,
+        #                                  hidden_size=self.d,
+        #                                  num_layers=2,
+        #                                  drop_prob=drop_prob)
 
-        self.out = layers.BiDAFOutput(hidden_size=self.d,
+        self.out = layers.BiDAFOutput(hidden_size=2* self.d,
                                       drop_prob=drop_prob)
 
     def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf=None, lemma_indicators=None, c_posner=None, q_posner=None):
@@ -107,8 +102,8 @@ class BiDAF(nn.Module):
             self_match = self.selfMatch(c_enc, c_enc, c_mask)
             assert att.size(2) == 2 * self.d
 
-            mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
-            out = self.out(torch.cat((self_match, att), dim=2), mod, c_mask)
+            #mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
+            out = self.out(torch.cat((self_match, att), dim=2), c_mask)
         else:
             mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
             #assert mod.size(2) == 2 * self.d
