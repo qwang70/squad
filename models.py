@@ -53,25 +53,36 @@ class BiDAF(nn.Module):
                                             drop_prob=drop_prob)
 
         if beta_selfatt:
-            self.selfMatch = attention.GoalNetwork(input_dim = 2 * self.d, query_dim = 2 * self.d, 
-                 embedding_dim = 2 * self.d, num_hidden = 2 * self.d,
-                 output_features = 2 * self.d, activation = nn.ReLU(), use_additive=False, use_token2token=None,
-                 use_self_attn=True)
+            self.selfMatch = attention.MultiAtt(embed_size = 2 * self.d, hidden_size = 2 * self.d, dropout_rate=0.2)
             self.enable_selfatt = False
+            self.mod = layers.RNNEncoder(input_size=4 * self.d,
+                                        hidden_size=2 * self.d,
+                                        num_layers=2,
+                                        drop_prob=drop_prob)
+
+            self.out = layers.BiDAFOutput(hidden_size=2 * self.d,
+                                        drop_prob=drop_prob)
         elif enable_selfatt:
             # self.selfMatch = layers.SelfMatcher(in_size = 8 * self.d,
             #                                  drop_prob=drop_prob)
             self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
                             input_size = 2 * self.d, attention_size = 2 * self.d,
                             drop_prob=drop_prob)
+            self.mod = layers.RNNEncoder(input_size=4 * self.d,
+                                        hidden_size=2 * self.d,
+                                        num_layers=2,
+                                        drop_prob=drop_prob)
 
-        self.mod = layers.RNNEncoder(input_size=2 * self.d,
-                                     hidden_size=self.d,
-                                     num_layers=2,
-                                     drop_prob=drop_prob)
+            self.out = layers.BiDAFOutput(hidden_size=2 * self.d,
+                                        drop_prob=drop_prob)
+        else: 
+            self.mod = layers.RNNEncoder(input_size=2 * self.d,
+                                        hidden_size=self.d,
+                                        num_layers=2,
+                                        drop_prob=drop_prob)
 
-        self.out = layers.BiDAFOutput(hidden_size=self.d,
-                                      drop_prob=drop_prob)
+            self.out = layers.BiDAFOutput(hidden_size=self.d,
+                                        drop_prob=drop_prob)
 
     def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf=None, lemma_indicators=None, c_posner=None, q_posner=None):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
@@ -106,16 +117,28 @@ class BiDAF(nn.Module):
         assert att.size(2) == 2 * self.d
 
         if self.beta_selfatt:
-            self_match = self.selfMatch(att, att)
+            self_match = self.selfMatch(c_enc, c_enc, c_mask, c_mask, c_len, c_len
+            )
         elif self.enable_selfatt:
             self_match = self.selfMatch(att, att, c_mask)
         else:
             self_match = att
         #assert att.size(2) == 2 * self.d
 
-        mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
-        #assert mod.size(2) == 2 * self.d
-
-        out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
+        if self.beta_selfatt:
+            self_match = self.selfMatch(c_enc, c_enc, c_mask, c_mask, c_len, c_len
+            )
+            assert att.size(2) == 2 * self.d
+            mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
+            out = self.out(torch.cat((self_match, att), dim=2), mod, c_mask)
+        elif self.enable_selfatt:
+            self_match = self.att(c_enc, c_enc, c_mask, c_mask)
+            assert att.size(2) == 2 * self.d
+            mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
+            out = self.out(torch.cat((self_match, att), dim=2), mod, c_mask)
+        else:
+            mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
+            assert mod.size(2) == 2 * self.d
+            out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
 
         return out

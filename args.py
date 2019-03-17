@@ -205,17 +205,17 @@ def add_common_args(parser):
                         type=str,
                         default='./data/test_eval.json')
     parser.add_argument('--enable_EM',
-                        type=bool,
-                        default=True)
+                        type=int,
+                        default=1)
     parser.add_argument('--enable_posner',
-                        type=bool,
-                        default=True)
+                        type=int,
+                        default=1)
     parser.add_argument('--enable_selfatt',
-                        type=bool,
-                        default=True)
+                        type=int,
+                        default=0)
     parser.add_argument('--beta_selfatt',
-                        type=bool,
-                        default=False)
+                        type=int,
+                        default=1)
 
 
 def add_train_test_args(parser):
