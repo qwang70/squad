@@ -122,12 +122,14 @@ def main(args):
                     #qwf = qwf.to(device)
                     lemma_indicators = lemma_indicators.to(device)
                 else:
+                    del cwf, lemma_indicators
                     cwf = None
                     lemma_indicators = None
                 if args.enable_posner:
                     c_posner = c_posner.to(device)
                     q_posner = q_posner.to(device)
                 else:
+                    del q_posner, c_posner 
                     q_posner = None
                     c_posner = None
                 batch_size = cw_idxs.size(0)
@@ -209,12 +211,14 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, enabl
                 #qwf = qwf.to(device)
                 lemma_indicators = lemma_indicators.to(device)
             else:
+                del cwf, lemma_indicators
                 cwf = None
                 lemma_indicators = None
             if enable_posner:
                 c_posner = c_posner.to(device)
                 q_posner = q_posner.to(device)
             else:
+                del q_posner, c_posner
                 q_posner = None
                 c_posner = None
             batch_size = cw_idxs.size(0)
