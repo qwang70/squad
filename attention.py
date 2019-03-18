@@ -67,9 +67,8 @@ class MultiAtt(nn.Module):
         # Convert list of lists into tensors
         # source_padded = self.vocab.src.to_input_tensor(source, device=self.device)   # Tensor: (src_len, b)
         # target_padded = self.vocab.tgt.to_input_tensor(target, device=self.device)   # Tensor: (tgt_len, b)
-        print(source.shape, src_mask.shape)
-        source_padded = source * src_mask.unsqueeze(2)
-        target_padded = target * tgt_mask
+        source_padded = (source * src_mask.float().unsqueeze(2)).permute(1,0,2)
+        target_padded = (target * tgt_mask.float().unsqueeze(2)).permute(1,0,2)
         
         ###     Run the network forward:
         ###     1. Apply the encoder to `source_padded` by calling `self.encode()`
@@ -87,7 +86,7 @@ class MultiAtt(nn.Module):
         # Compute log probability of generating true target words
         # target_gold_words_log_prob = torch.gather(P, index=target_padded[1:].unsqueeze(-1), dim=-1).squeeze(-1) * target_masks[1:]
         # scores = target_gold_words_log_prob.sum(dim=0)
-        return combined_outputs
+        return combined_outputs.permute(1,0,2)
     def encode(self, source_padded: torch.Tensor, source_lengths: torch.Tensor) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """ Apply the encoder to source sentences to obtain encoder hidden states.
             Additionally, take the final states of the encoder and project them to obtain initial states for decoder.
@@ -141,15 +140,15 @@ class MultiAtt(nn.Module):
         orig_len = x.size(1)
 
         # Sort by length and pack sequence for RNN
-        lengths, sort_idx = lengths.sort(0, descending=True)
-        x = x[sort_idx]     # (batch_size, seq_len, input_size)
-        x = pack_padded_sequence(x, source_lengths, batch_first=True)
-        enc_hiddens, (last_hidden, last_cell) = self.encoder(pack_padded_sequence(x, source_lengths))
+        source_lengths, sort_idx = source_lengths.sort(0, descending=True)
+        x = x[:,sort_idx,:]     # (batch_size, seq_len, input_size)
+        x = pack_padded_sequence(x, source_lengths, batch_first=False)
+        enc_hiddens, (last_hidden, last_cell) = self.encoder(x)
 
         # Unpack and reverse sort
-        x, _ = pad_packed_sequence(x, batch_first=True)
+        x, _ = pad_packed_sequence(x, batch_first=False)
         _, unsort_idx = sort_idx.sort(0)
-        x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
+        x = x[:,unsort_idx,:]   # (batch_size, seq_len, 2 * hidden_size)
 
         # print(dir(enc_hiddens))
         # print("enc_hiddens", enc_hiddens.size())
