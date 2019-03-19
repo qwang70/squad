@@ -1,4 +1,4 @@
 python train.py --enable_EM True --enable_posner True --enable_selfatt True -n NAME
-python test.py --split dev --enable_EM True --enable_posner True --enable_selfatt True --load_path save/train/FOLDER/best.pth.tar --name NAME
+python test.py --split dev --enable_EM 1 --enable_posner 1 --enable_selfatt 1 --load_path save/train/FOLDER/best.pth.tar --name NAME
 tensorboard --logdir save --port 5678
 ssh -N -f -L localhost:1234:localhost:5678 <user>@<remote>
