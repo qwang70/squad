@@ -103,8 +103,7 @@ class BiDAF(nn.Module):
         assert att.size(2) == 2 * self.d
 
         if self.enable_selfatt:
-            self_match = self.att(c_enc, c_enc,
-                       c_mask, c_mask)
+            self_match = self.att(c_enc, c_enc, c_mask, c_mask)
             assert att.size(2) == 2 * self.d
 
             mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)

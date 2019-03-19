@@ -232,14 +232,14 @@ class BiDAFOutput(nn.Module):
         self.mod_linear_1 = nn.Linear(2 * hidden_size, 1)
 
         self.rnn = RNNEncoder(input_size=2 * hidden_size,
-                              hidden_size=hidden_size,
-                              num_layers=1,
-                              drop_prob=drop_prob)
+                               hidden_size=hidden_size,
+                               num_layers=1,
+                               drop_prob=drop_prob)
 
         self.att_linear_2 = nn.Linear(2 * hidden_size, 1)
         self.mod_linear_2 = nn.Linear(2 * hidden_size, 1)
 
-    def forward(self, att, mod, mask):
+    def forward(self, att, mask):
         # Shapes: (batch_size, seq_len, 1)
         logits_1 = self.att_linear_1(att) + self.mod_linear_1(mod)
         mod_2 = self.rnn(mod, mask.sum(-1))
