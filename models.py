@@ -52,18 +52,18 @@ class BiDAF(nn.Module):
         self.enable_selfatt = enable_selfatt
         
         if enable_selfatt:
-            self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
-                                input_size = 2 * self.d, attention_size = 2 * self.d,
-                                drop_prob=drop_prob)drop_prob=drop_prob)
-            self.mod = layers.RNNEncoder(input_size=4 * self.d,
-                                         hidden_size=2 * self.d,
+            self.selfMatch = layers.StaticDotAttention(memory_size = 4 * self.d, 
+                                input_size = 2 * self.d, attention_size = 4 * self.d,
+                                drop_prob=drop_prob)
+            self.mod = layers.RNNEncoder(input_size=8 * self.d,
+                                         hidden_size=self.d,
                                          num_layers=2,
                                          drop_prob=drop_prob)
-            self.out = layers.BiDAFOutput(hidden_size=2 * self.d,
+            self.out = layers.BiDAFOutput(hidden_size=self.d,
                                           drop_prob=drop_prob)
                                          
         else:
-            self.mod = layers.RNNEncoder(input_size=2 * self.d,
+            self.mod = layers.RNNEncoder(input_size=8 * self.d,
                                              hidden_size=self.d,
                                              num_layers=2,
                                              drop_prob=drop_prob)
@@ -105,11 +105,14 @@ class BiDAF(nn.Module):
         assert att.size(2) == 2 * self.d
 
         if self.enable_selfatt:
-            self_match = self.selfMatch(c_enc, c_enc, c_mask)
-            assert att.size(2) == 2 * self.d
+            self_match = self.selfMatch(att, att, c_mask)
+            # output 8 d
+            # assert att.size(2) == 2 * self.d
 
-            mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
-            out = self.out(torch.cat((self_match, att), dim=2), mod, c_mask)
+            # input 8 d
+            mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
+            # input 16 d
+            out = self.out(self_match, mod, c_mask)
         else:
             mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
             #assert mod.size(2) == 2 * self.d

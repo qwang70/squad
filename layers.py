@@ -185,7 +185,7 @@ class BiDAFAttention(nn.Module):
         b = torch.bmm(torch.bmm(s1, s2.transpose(1, 2)), c)
 
         x = torch.cat([c, a, c * a, c * b], dim=2)  # (bs, c_len, 4 * hid_size)
-        x = self.linear_relu(x)                     # (bs, c_len, hid_size)
+        # x = self.linear_relu(x)                     # (bs, c_len, hid_size)
         return x
 
     def get_similarity_matrix(self, c, q):
@@ -365,7 +365,7 @@ class StaticDotAttention(nn.Module):
     def forward(self, inputs, memory, memory_mask):
 
         # archi from 224n winner
-        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 2d +- 1 )
+        input_ = self.rnn(inputs, memory_mask.sum(-1))      # (batch, c_len, 4 d )
         assert input_.shape == inputs.shape
         logits = self.get_similarity_matrix(input_, input_) # (batch, c_len, c_len)
         assert logits.shape == (input_.size(0), input_.size(1), input_.size(1))
