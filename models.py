@@ -44,16 +44,15 @@ class BiDAF(nn.Module):
 
         self.enc = layers.RNNEncoder(input_size=self.d,
                                      hidden_size=self.d,
-                                     num_layers=1,
+                                     num_layers=1, drop_prob=drop_prob)
 
         self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
-
         self.enable_selfatt = enable_selfatt
         
         if enable_selfatt:
-            self.selfMatch = layers.StaticDotAttention(memory_size = 4 * self.d, 
-                                input_size = 2 * self.d, attention_size = 4 * self.d,
+            self.selfMatch = layers.StaticDotAttention(memory_size = 8 * self.d, 
+                                input_size = 8 * self.d, attention_size = 8 * self.d,
                                 drop_prob=drop_prob)
             self.mod = layers.RNNEncoder(input_size=8 * self.d,
                                          hidden_size=self.d,
@@ -102,7 +101,7 @@ class BiDAF(nn.Module):
 
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 2 * d)
-        assert att.size(2) == 2 * self.d
+        assert att.size(2) == 8 * self.d
 
         if self.enable_selfatt:
             self_match = self.selfMatch(att, att, c_mask)
@@ -112,11 +111,11 @@ class BiDAF(nn.Module):
             # input 8 d
             mod = self.mod(self_match, c_len)        # (batch_size, c_len, 2 * d)
             # input 16 d
-            out = self.out(self_match, mod, c_mask)
+            out = self.out(mod, c_mask)
         else:
             mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * d)
             #assert mod.size(2) == 2 * self.d
-            out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
+            out = self.out(mod, c_mask)  # 2 tensors, each (batch_size, c_len)
     
 
         return out
