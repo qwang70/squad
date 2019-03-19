@@ -45,7 +45,6 @@ class BiDAF(nn.Module):
         self.enc = layers.RNNEncoder(input_size=self.d,
                                      hidden_size=self.d,
                                      num_layers=1,
-                                     drop_prob=drop_prob)
 
         self.att = layers.BiDAFAttention(hidden_size=2 * self.d,
                                          drop_prob=drop_prob)
@@ -53,17 +52,25 @@ class BiDAF(nn.Module):
         self.enable_selfatt = enable_selfatt
         
         if enable_selfatt:
-            self.selfMatch = layers.BiDAFAttention(hidden_size=2 * self.d,
+            self.selfMatch = layers.StaticDotAttention(memory_size = 2 * self.d, 
+                                input_size = 2 * self.d, attention_size = 2 * self.d,
+                                drop_prob=drop_prob)drop_prob=drop_prob)
+            self.mod = layers.RNNEncoder(input_size=4 * self.d,
+                                         hidden_size=2 * self.d,
+                                         num_layers=2,
                                          drop_prob=drop_prob)
-                                         
-        self.mod = layers.RNNEncoder(input_size=4 * self.d,
-                                          hidden_size=2 *self.d,
-                                          num_layers=2,
+            self.out = layers.BiDAFOutput(hidden_size=2 * self.d,
                                           drop_prob=drop_prob)
+                                         
+        else:
+            self.mod = layers.RNNEncoder(input_size=2 * self.d,
+                                             hidden_size=self.d,
+                                             num_layers=2,
+                                             drop_prob=drop_prob)
 
-        self.out = layers.BiDAFOutput(hidden_size=2* self.d,
-                                      drop_prob=drop_prob)
-
+            self.out = layers.BiDAFOutput(hidden_size=self.d,
+                                          drop_prob=drop_prob)
+                                         
     def forward(self, cc_idxs, qc_idxs, cw_idxs, qw_idxs, cwf=None, lemma_indicators=None, c_posner=None, q_posner=None):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
@@ -98,7 +105,7 @@ class BiDAF(nn.Module):
         assert att.size(2) == 2 * self.d
 
         if self.enable_selfatt:
-            self_match = self.att(c_enc, c_enc, c_mask, c_mask)
+            self_match = self.selfMatch(c_enc, c_enc, c_mask)
             assert att.size(2) == 2 * self.d
 
             mod = self.mod(torch.cat((self_match, att), dim=2), c_len)        # (batch_size, c_len, 2 * d)
