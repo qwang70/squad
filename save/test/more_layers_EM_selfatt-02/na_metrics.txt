@@ -1,0 +1,6 @@
+p_a: predicted has answer. p_n: predicted no answer. g_a: golden has answer. g_n goldern no answer
+    tp: predicted has answer ^ golden has answer.
+    p_a:3238	p_n:2713	g_a:2848	g_n:3103
+    tp:2242	fp:996	tn:2107	fn:606
+    precision:0.692402717726992	recall:0.7872191011235955
+    f1:0.7367729214590865

@@ -1,0 +1,30 @@
+[03.20.19 04:53:28] Args: {
+    "batch_size": 100,
+    "char_emb_file": "./data/char_emb.json",
+    "dev_eval_file": "./data/dev_eval.json",
+    "dev_record_file": "./data/dev_features.npz",
+    "enable_EM": 1,
+    "enable_posner": 0,
+    "enable_selfatt": 1,
+    "hidden_size": 100,
+    "load_path": "save/train/more_layers_EM_selfatt-02/best.pth.tar",
+    "max_ans_len": 12,
+    "name": "more_layers_EM_selfatt",
+    "num_visuals": 10,
+    "num_workers": 4,
+    "save_dir": "./save/test/more_layers_EM_selfatt-03",
+    "split": "test",
+    "sub_file": "submission.csv",
+    "test_eval_file": "./data/test_eval.json",
+    "test_record_file": "./data/test_features.npz",
+    "train_eval_file": "./data/train_eval.json",
+    "train_record_file": "./data/train_features.npz",
+    "use_squad_v2": true,
+    "word_emb_file": "./data/word_emb.json"
+}
+[03.20.19 04:53:28] Loading embeddings...
+[03.20.19 04:53:32] Building model...
+[03.20.19 04:53:32] Loading checkpoint from save/train/more_layers_EM_selfatt-02/best.pth.tar...
+[03.20.19 04:53:35] Building dataset...
+[03.20.19 04:53:45] Evaluating on test split...
+[03.20.19 04:54:12] Writing submission file to ./save/test/more_layers_EM_selfatt-03/test_submission.csv...
